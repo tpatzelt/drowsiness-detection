@@ -1,2 +1,4 @@
 .idea/*
 old_models/*
+data/
+notebooks/.ipynb_checkpoints/*
