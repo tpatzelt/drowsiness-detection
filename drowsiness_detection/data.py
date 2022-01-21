@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Generator
 
 import pandas as pd
 
@@ -9,6 +10,8 @@ from drowsiness_detection.response_features import add_karolinska_file_to_featur
 
 
 def session_file_to_df(filepath: str, filepath_response: str) -> pd.DataFrame:
+    """ Parses a session file and the corresponding karolinska response file.
+        The data is clipped to be in [0,1]."""
     print(
         f"Extracting file {filepath} and response file: {filepath_response}.")
     with open(filepath) as fp:
@@ -47,14 +50,16 @@ def session_file_to_df(filepath: str, filepath_response: str) -> pd.DataFrame:
     df_closure_and_state = add_karolinska_file_to_feature_df(
         filepath=filepath_response, feature_df=df_closure_and_state)
     # create multi-index
-    multi_index = pd.MultiIndex.from_product(
-        [[filename], df_closure_and_state.index], names=["filename", "frame"])
-    df_closure_and_state.index = multi_index
+    # multi_index = pd.MultiIndex.from_product(
+    #     [[filename], df_closure_and_state.index], names=["filename", "frame"])
+    # df_closure_and_state.index = multi_index
     # df_closure_and_state.dropna(inplace=True)
     return df_closure_and_state
 
 
-def create_raw_dataset():
+def create_eye_closure_karolinksa_dataset() -> Generator[pd.DataFrame, None, None]:
+    """Generator that yields the combined_eye_closure signal and karolinksa response
+    for each session."""
     session_identifier = "karolinska"
     files = [str(p) for p in DATA_PATH.joinpath("sleep_alc_labels").iterdir()]
 
@@ -64,12 +69,16 @@ def create_raw_dataset():
 
     # feature_files = ["../data/potsdam_aeye_112020/014_1_b.json"]
     # session_files = ["../data/sleep_alc_labels/014_1_b_karolinska.csv"]
-    full_df = pd.concat(
-        list(map(session_file_to_df, feature_files, session_files)))
-    return full_df
+    for feature_file, session_file in zip(feature_files, session_files):
+        full_df = session_file_to_df(filepath=feature_file, filepath_response=session_file)
+        small_df = full_df[["combined_eye_closure", "karolinska_response_linear_interpolation"]]
+        small_df.columns = ["eye_closure", "kss"]
+        small_df.name = Path(feature_file).stem
+        yield small_df
 
 
 def create_handcrafted_data(interval: int = 60):
+    raise NotImplementedError
     full_df = create_raw_dataset()
     full_df = full_df[full_df["session_type"] != 0]  # use only baseline and sleep-deprived session data
     df_views = []
@@ -88,7 +97,9 @@ def create_handcrafted_data(interval: int = 60):
     new_df.pop("frame")
     return new_df
 
+
 def load_handcrafted_data(interval: int = 60):
+    raise NotImplementedError
     filename = DATA_PATH.joinpath(f"sleepiness_data_{interval}s.pkl")
     try:
         df = pd.read_pickle(filename)
