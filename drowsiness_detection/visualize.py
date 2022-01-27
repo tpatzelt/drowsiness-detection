@@ -123,4 +123,4 @@ def show_frame_slider(data: np.array, n_frames: int = 60):
         fig.canvas.draw_idle()
 
     sframes.on_changed(update)
-    return sframes
+    return sframes, ax
