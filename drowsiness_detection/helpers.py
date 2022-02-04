@@ -49,3 +49,7 @@ def ordinal_to_label(arr):
     probs = pd.DataFrame(coral.ordinal_softmax(arr).numpy())
     labels_v1 = probs.idxmax(axis=1).values
     return labels_v1
+
+
+def binarize(arr: np.ndarray, threshold: float) -> np.ndarray:
+    return (arr < threshold).astype(int)
