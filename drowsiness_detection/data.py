@@ -2,9 +2,12 @@ from pathlib import Path
 from random import choice
 
 import numpy as np
+import pandas as pd
 
 from drowsiness_detection import config
 
+with open(config.FEATURE_NAMES_PATH) as fp:
+    FEATURE_NAMES = fp.read().split("\n")
 
 def bytes_to_MB(b=int):
     return b / 1024 / 1024
@@ -66,6 +69,8 @@ def window_files_train_test_split(
      train set."""
     if not target_dir.exists():
         target_dir.mkdir()
+    else:
+        raise RuntimeError("directory exists.")
     test_names = name_generator(base_name="test")
     train_names = name_generator(base_name="train")
     test_arrays = [ArrayWrapper(directory=target_dir, filename_generator=test_names, max_size_mb=max_filesize_in_mb, n_cols=n_cols) for _ in range(test_size)]
@@ -76,12 +81,12 @@ def window_files_train_test_split(
     for feature_file in config.WINDOW_FEATURES_PATH.iterdir():
         features = np.load(feature_file)
         targets = get_kss_labels_for_feature_file(feature_file)
-        for features, target in zip(np.nditer(features), np.nditer(targets)):
+        merged_arr = np.c_[features, targets]
+        for row in merged_arr:
             target_array = choice(all_arrays)
-            target_array.add(features + target)
+            target_array.add(row)
     for arr in all_arrays:
         arr.close()
-
 
 def get_train_test_splits(directory: Path = config.DATA_PATH.joinpath("TrainTestSplits")):
     test_data, train_data = [], []
@@ -96,5 +101,10 @@ def get_train_test_splits(directory: Path = config.DATA_PATH.joinpath("TrainTest
     return np.concatenate(train_data), np.concatenate(test_data)
 
 
+def feature_array_to_df(arr: np.ndarray) -> pd.DataFrame:
+    with open(config.FEATURE_NAMES_PATH) as fp:
+        features_names = fp.read().split("\n")
+    return pd.DataFrame(arr, columns=features_names)
+
 if __name__ == '__main__':
-    ...
+    window_files_train_test_split()
