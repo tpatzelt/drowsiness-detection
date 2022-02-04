@@ -106,3 +106,4 @@ widgetsnbextension==3.5.2
 wrapt==1.12.1
 zipp==3.6.0
 click==8.0.3
+prettytable==3.0.0
