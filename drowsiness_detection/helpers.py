@@ -1,4 +1,5 @@
 from functools import reduce
+from pathlib import Path
 
 import coral_ordinal as coral
 import numpy as np
@@ -53,3 +54,47 @@ def ordinal_to_label(arr):
 
 def binarize(arr: np.ndarray, threshold: float) -> np.ndarray:
     return (arr < threshold).astype(int)
+
+
+class ArrayWrapper:
+    def __init__(self, directory: Path, filename_generator, max_size_mb=1, n_cols=1):
+        self.max_size_mb = max_size_mb
+        self.directory = directory
+        self.name_gen = filename_generator
+        self.array = create_emtpy_array_of_max_size(max_size_mb=max_size_mb, n_cols=n_cols)
+        self.i = iter(range(self.array.shape[0]))
+        self.n_cols = n_cols
+
+    def add(self, row):
+        try:
+            next_i = next(self.i)
+            self.array[next_i] = row
+        except StopIteration:
+            np.save(file=self.directory.joinpath(next(self.name_gen)), arr=self.array)
+            self.array = create_emtpy_array_of_max_size(max_size_mb=self.max_size_mb,
+                                                        n_cols=self.n_cols)
+            self.i = iter(range(self.array.shape[0]))
+
+    def close(self):
+        np.save(file=self.directory.joinpath(next(self.name_gen)), arr=self.array[:next(self.i)])
+
+
+def create_emtpy_array_of_max_size(max_size_mb, n_cols):
+    max_bytes = MB_to_bytes(mb=max_size_mb)
+    max_rows = np.floor(max_bytes / 8 / n_cols)
+    return np.empty(shape=(max_rows.astype(int), n_cols))
+
+
+def bytes_to_MB(b=int):
+    return b / 1024 / 1024
+
+
+def MB_to_bytes(mb=int):
+    return mb * 1024 * 1024
+
+
+def name_generator(base_name: str) -> str:
+    i = 0
+    while True:
+        yield base_name + "_" + str(i)
+        i += 1

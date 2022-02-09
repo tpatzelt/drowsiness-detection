@@ -5,50 +5,20 @@ import numpy as np
 import pandas as pd
 
 from drowsiness_detection import config
+from drowsiness_detection.helpers import binarize, ArrayWrapper, name_generator
+
+session_type_mapping = dict(a=1, b=2, e=3, s=4)
 
 with open(config.FEATURE_NAMES_PATH) as fp:
     FEATURE_NAMES = fp.read().split("\n")
 
-def bytes_to_MB(b=int):
-    return b / 1024 / 1024
 
-
-def MB_to_bytes(mb=int):
-    return mb * 1024 * 1024
-
-
-def name_generator(base_name: str) -> str:
-    i = 0
-    while True:
-        yield base_name + "_" + str(i)
-        i += 1
-
-
-def create_emtpy_array_of_max_size(max_size_mb, n_cols):
-    max_bytes = MB_to_bytes(mb=max_size_mb)
-    max_rows = np.floor(max_bytes / 8 / n_cols)
-    return np.empty(shape=(max_rows.astype(int), n_cols))
-
-
-class ArrayWrapper:
-    def __init__(self, directory: Path, filename_generator, max_size_mb=1, n_cols=1):
-        self.max_size_mb = max_size_mb
-        self.directory = directory
-        self.name_gen = filename_generator
-        self.array = create_emtpy_array_of_max_size(max_size_mb=max_size_mb, n_cols=n_cols)
-        self.i = iter(range(self.array.shape[0]))
-
-    def add(self, row):
-        try:
-            next_i = next(self.i)
-            self.array[next_i] = row
-        except StopIteration:
-            np.save(file=self.directory.joinpath(next(self.name_gen)), arr=self.array)
-            self.array = create_emtpy_array_of_max_size(max_size_mb=self.max_size_mb, n_cols=n_cols)
-            self.i = iter(range(self.array.shape[0]))
-
-    def close(self):
-        np.save(file=self.directory.joinpath(next(self.name_gen)), arr=self.array[:next(self.i)])
+def filename_to_session_type_and_id(filename: Path):
+    a = filename.name
+    elements = a.split("_")
+    session_type = elements[-2]
+    identifier = int(elements[2])
+    return session_type, identifier
 
 
 def get_kss_labels_for_feature_file(feature_file_path):
@@ -62,7 +32,8 @@ def get_kss_labels_for_feature_file(feature_file_path):
 
 
 def window_files_train_test_split(
-        target_dir: Path = config.DATA_PATH.joinpath("TrainTestSplits"), max_filesize_in_mb: int = 100, n_cols: int = 68, train_size: int = 2,
+        target_dir: Path = config.DATA_PATH.joinpath("TrainTestSplits_10sec"),
+        max_filesize_in_mb: int = 100, n_cols: int = 68, train_size: int = 2,
         test_size: int = 1):
     """ Iterates through all features files under 'config.WINDOW_FEATURES_PATH,
      fetches the label file and writes each row randomly to either the test or
@@ -71,24 +42,38 @@ def window_files_train_test_split(
         target_dir.mkdir()
     else:
         raise RuntimeError("directory exists.")
+    test_identifiers, train_identifiers = [], []
     test_names = name_generator(base_name="test")
     train_names = name_generator(base_name="train")
-    test_arrays = [ArrayWrapper(directory=target_dir, filename_generator=test_names, max_size_mb=max_filesize_in_mb, n_cols=n_cols) for _ in range(test_size)]
-    train_arrays = [ArrayWrapper(directory=target_dir, filename_generator=train_names, max_size_mb=max_filesize_in_mb, n_cols=n_cols) for _ in
+    test_arrays = [ArrayWrapper(directory=target_dir, filename_generator=test_names,
+                                max_size_mb=max_filesize_in_mb, n_cols=n_cols) for _ in
+                   range(test_size)]
+    train_arrays = [ArrayWrapper(directory=target_dir, filename_generator=train_names,
+                                 max_size_mb=max_filesize_in_mb, n_cols=n_cols) for _ in
                     range(train_size)]
     all_arrays = (*test_arrays, *train_arrays)
 
     for feature_file in config.WINDOW_FEATURES_PATH.iterdir():
+        sess_type, subject_id = filename_to_session_type_and_id(feature_file)
         features = np.load(feature_file)
         targets = get_kss_labels_for_feature_file(feature_file)
         merged_arr = np.c_[features, targets]
         for row in merged_arr:
             target_array = choice(all_arrays)
             target_array.add(row)
+            if target_array in test_arrays:
+                test_identifiers.append((session_type_mapping[sess_type], subject_id))
+            else:
+                train_identifiers.append((session_type_mapping[sess_type], subject_id))
     for arr in all_arrays:
         arr.close()
 
-def get_train_test_splits(directory: Path = config.DATA_PATH.joinpath("TrainTestSplits")):
+    np.save(target_dir.joinpath("train_identifiers"), train_identifiers)
+    np.save(target_dir.joinpath("test_identifiers"), test_identifiers)
+
+
+def get_train_test_splits(directory: Path = config.DATA_PATH.joinpath("TrainTestSplits_10sec")):
+    KSS_THRESHOLD = 7
     test_data, train_data = [], []
     for file in directory.iterdir():
         arr = np.load(file=file)
@@ -98,13 +83,47 @@ def get_train_test_splits(directory: Path = config.DATA_PATH.joinpath("TrainTest
             train_data.append(arr)
         else:
             raise RuntimeError(f"Cannot assign {file} to train or test split.")
-    return np.concatenate(train_data), np.concatenate(test_data)
+    train = np.concatenate(train_data)
+    test = np.concatenate(test_data)
+
+    # X still contains NaNs
+    train = np.nan_to_num(train, nan=-1)
+    test = np.nan_to_num(test, nan=-1)
+
+    X_train, y_train = train[:, :-1], train[:, -1]
+    X_test, y_test = test[:, :-1], test[:, -1]
+
+    # binarize data
+    y_train, y_test = binarize(y_train, KSS_THRESHOLD), binarize(y_test, KSS_THRESHOLD)
+    return X_train, y_train, X_test, y_test
+
+
+def get_data_not_splitted(directory: Path = config.DATA_PATH.joinpath("TrainTestSplits_10sec")):
+    X_train, y_train, X_test, y_test = get_train_test_splits(directory=directory)
+    # split in full data for CV
+    X = np.concatenate([X_train, X_test])
+    y = np.concatenate([y_train, y_test])
+    return X, y
+
+
+def get_identifier_array_train_test_split(
+        directory: Path = config.DATA_PATH.joinpath("TrainTestSplits_10sec")):
+    train_idents = np.load(directory.joinpath("train_identifiers.npy"))
+    test_idents = np.load(directory.joinpath("test_identifiers.npy"))
+    return train_idents, test_idents
+
+
+def get_identifier_array_not_splitted(
+        directory: Path = config.DATA_PATH.joinpath("TrainTestSplits_10sec")):
+    train_idents, test_idents = get_identifier_array_train_test_split(directory=directory)
+    return np.concatenate([train_idents, test_idents])
 
 
 def feature_array_to_df(arr: np.ndarray) -> pd.DataFrame:
     with open(config.FEATURE_NAMES_PATH) as fp:
         features_names = fp.read().split("\n")
     return pd.DataFrame(arr, columns=features_names)
+
 
 if __name__ == '__main__':
     window_files_train_test_split()
