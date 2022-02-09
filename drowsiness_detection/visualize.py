@@ -1,55 +1,12 @@
-import pandas as pd
-
-pd.set_option("display.precision", 2)
-from sklearn.metrics import confusion_matrix
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib import animation
 from matplotlib.widgets import Slider
+from sklearn.metrics import RocCurveDisplay
+from sklearn.metrics import auc
+from sklearn.model_selection import StratifiedKFold
 
-
-def plot_confusion_matrix(cm, classes,
-                          normalize=False,
-                          title='Confusion matrix',
-                          cmap=plt.cm.Blues):
-    """
-    This function prints and plots the confusion matrix.
-    Normalization can be applied by setting `normalize=True`.
-    """
-    import itertools
-    if normalize:
-        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
-        print("Normalized confusion matrix")
-    else:
-        print('Confusion matrix, without normalization')
-
-    # print(cm)
-
-    plt.imshow(cm, interpolation='nearest', cmap=cmap)
-    plt.title(title)
-    plt.colorbar()
-    tick_marks = np.arange(len(classes))
-    plt.xticks(tick_marks, classes, rotation=45)
-    plt.yticks(tick_marks, classes)
-
-    fmt = '.2f' if normalize else 'd'
-    thresh = cm.max() / 2.
-    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
-        plt.text(j, i, format(cm[i, j], fmt),
-                 horizontalalignment="center",
-                 color="white" if cm[i, j] > thresh else "black")
-
-    plt.ylabel('True label')
-    plt.xlabel('Predicted label')
-    plt.tight_layout()
-
-
-def plot_cm_matrix(model, X_test, y_test):
-    y_pred = model.predict_classes(X_test)
-    y_test_single_digit = np.argmax(y_test, axis=-1)
-    c_matrix = confusion_matrix(y_test_single_digit, y_pred)
-    plt.figure()
-    plot_confusion_matrix(c_matrix, classes=list("0123456789"))
+from drowsiness_detection.data import get_session_idx, get_subject_idx
 
 
 def plot_acc_and_loss(history):
@@ -79,12 +36,15 @@ def generate_blink_animation(data: np.array, name: str, n_frames: int = 60):
     # ax.legend(["eye closure signal"])
 
     def drawframe(n):
-        line.set_data(np.arange(n - n_frames // 2, n + n_frames // 2), data[n - n_frames // 2:n + n_frames // 2])
+        line.set_data(np.arange(n - n_frames // 2, n + n_frames // 2),
+                      data[n - n_frames // 2:n + n_frames // 2])
         txt_title.set_text(f"Frame = {n}")
         ax.set_xlim((n - n_frames // 2, n + n_frames // 2))
         return line,
 
-    anim = animation.FuncAnimation(fig, drawframe, frames=range(n_frames // 2, len(data) - n_frames // 2), interval=20, blit=True)
+    anim = animation.FuncAnimation(fig, drawframe,
+                                   frames=range(n_frames // 2, len(data) - n_frames // 2),
+                                   interval=20, blit=True)
     writervideo = animation.FFMpegWriter(fps=30)
     return anim.save(f"{name}.mp4", writer=writervideo)
 
@@ -107,7 +67,8 @@ def show_frame_slider(data: np.array, n_frames: int = 60):
 
     ax_frames = plt.axes([0.25, 0.1, 0.65, 0.03])
 
-    allowed_frames = np.arange(n_frames // 2, len(data) - n_frames // 2, step=2)  # does the video frame start at 0 or 1?
+    allowed_frames = np.arange(n_frames // 2, len(data) - n_frames // 2,
+                               step=2)  # does the video frame start at 0 or 1?
 
     sframes = Slider(
         ax_frames, "Frame", valmin=n_frames // 2, valmax=len(data) - n_frames // 2,
@@ -124,3 +85,181 @@ def show_frame_slider(data: np.array, n_frames: int = 60):
 
     sframes.on_changed(update)
     return sframes, ax
+
+
+def plot_roc_over_n_folds(classifier, X, y, n_splits=6, fit_model=False):
+    cv = StratifiedKFold(n_splits=n_splits)
+
+    tprs = []
+    aucs = []
+    mean_fpr = np.linspace(0, 1, 100)
+
+    fig, ax = plt.subplots()
+    for i, (train, test) in enumerate(cv.split(X, y)):
+        if fit_model:
+            classifier.fit(X[train], y[train])
+        viz = RocCurveDisplay.from_estimator(
+            classifier,
+            X[test],
+            y[test],
+            name="ROC fold {}".format(i),
+            alpha=0.3,
+            lw=1,
+            ax=ax,
+        )
+        interp_tpr = np.interp(mean_fpr, viz.fpr, viz.tpr)
+        interp_tpr[0] = 0.0
+        tprs.append(interp_tpr)
+        aucs.append(viz.roc_auc)
+
+    ax.plot([0, 1], [0, 1], linestyle="--", lw=2, color="r", label="Chance", alpha=0.8)
+
+    mean_tpr = np.mean(tprs, axis=0)
+    mean_tpr[-1] = 1.0
+    mean_auc = auc(mean_fpr, mean_tpr)
+    std_auc = np.std(aucs)
+    ax.plot(
+        mean_fpr,
+        mean_tpr,
+        color="b",
+        label=r"Mean ROC (AUC = %0.2f $\pm$ %0.2f)" % (mean_auc, std_auc),
+        lw=2,
+        alpha=0.8,
+    )
+
+    std_tpr = np.std(tprs, axis=0)
+    tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
+    tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
+    ax.fill_between(
+        mean_fpr,
+        tprs_lower,
+        tprs_upper,
+        color="grey",
+        alpha=0.2,
+        label=r"$\pm$ 1 std. dev.",
+    )
+
+    ax.set(
+        xlim=[-0.05, 1.05],
+        ylim=[-0.05, 1.05],
+        title="Receiver operating characteristic example",
+    )
+    ax.legend(loc="lower right")
+    plt.show()
+
+
+def plot_roc_over_sessions(classifier, identifiers: np.ndarray, X: np.ndarray, y: np.ndarray):
+    session_idx = get_session_idx(ids=identifiers)
+    tprs = []
+    aucs = []
+    mean_fpr = np.linspace(0, 1, 100)
+
+    fig, ax = plt.subplots()
+    for indices, name in session_idx:
+        viz = RocCurveDisplay.from_estimator(
+            classifier,
+            X[indices],
+            y[indices],
+            name="Session type: {}".format(name),
+            alpha=0.3,
+            lw=1,
+            ax=ax,
+        )
+        interp_tpr = np.interp(mean_fpr, viz.fpr, viz.tpr)
+        interp_tpr[0] = 0.0
+        tprs.append(interp_tpr)
+        aucs.append(viz.roc_auc)
+
+    ax.plot([0, 1], [0, 1], linestyle="--", lw=2, color="r", label="Chance", alpha=0.8)
+
+    mean_tpr = np.mean(tprs, axis=0)
+    mean_tpr[-1] = 1.0
+    mean_auc = auc(mean_fpr, mean_tpr)
+    std_auc = np.std(aucs)
+    ax.plot(
+        mean_fpr,
+        mean_tpr,
+        color="b",
+        label=r"Mean ROC (AUC = %0.2f $\pm$ %0.2f)" % (mean_auc, std_auc),
+        lw=2,
+        alpha=0.8,
+    )
+
+    std_tpr = np.std(tprs, axis=0)
+    tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
+    tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
+    ax.fill_between(
+        mean_fpr,
+        tprs_lower,
+        tprs_upper,
+        color="grey",
+        alpha=0.2,
+        label=r"$\pm$ 1 std. dev.",
+    )
+
+    ax.set(
+        xlim=[-0.05, 1.05],
+        ylim=[-0.05, 1.05],
+        title="Receiver operating characteristic example",
+    )
+    ax.legend(loc="lower right")
+    plt.show()
+
+
+def plot_roc_over_subjects(classifier, identifiers: np.ndarray, X: np.ndarray, y: np.ndarray):
+    session_idx = get_subject_idx(ids=identifiers)
+    tprs = []
+    aucs = []
+    mean_fpr = np.linspace(0, 1, 100)
+
+    fig, ax = plt.subplots()
+    for indices, name in session_idx:
+        viz = RocCurveDisplay.from_estimator(
+            classifier,
+            X[indices],
+            y[indices],
+            name="Subject {}".format(name),
+            alpha=0.3,
+            lw=1,
+            ax=ax,
+        )
+        interp_tpr = np.interp(mean_fpr, viz.fpr, viz.tpr)
+        interp_tpr[0] = 0.0
+        tprs.append(interp_tpr)
+        aucs.append(viz.roc_auc)
+
+    ax.plot([0, 1], [0, 1], linestyle="--", lw=2, color="r", label="Chance", alpha=0.8)
+
+    mean_tpr = np.mean(tprs, axis=0)
+    mean_tpr[-1] = 1.0
+    mean_auc = auc(mean_fpr, mean_tpr)
+    std_auc = np.std(aucs)
+    ax.plot(
+        mean_fpr,
+        mean_tpr,
+        color="b",
+        label=r"Mean ROC (AUC = %0.2f $\pm$ %0.2f)" % (mean_auc, std_auc),
+        lw=2,
+        alpha=0.8,
+    )
+
+    std_tpr = np.std(tprs, axis=0)
+    tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
+    tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
+    ax.fill_between(
+        mean_fpr,
+        tprs_lower,
+        tprs_upper,
+        color="grey",
+        alpha=0.2,
+        label=r"$\pm$ 1 std. dev.",
+    )
+
+    ax.set(
+        xlim=[-0.05, 1.05],
+        ylim=[-0.05, 1.05],
+        title="Receiver operating characteristic example",
+    )
+    ax.legend(loc="lower right")
+    ax.legend().set_visible(False)
+    plt.show()

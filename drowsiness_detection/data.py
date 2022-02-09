@@ -32,7 +32,7 @@ def get_kss_labels_for_feature_file(feature_file_path):
 
 
 def window_files_train_test_split(
-        target_dir: Path = config.DATA_PATH.joinpath("TrainTestSplits_10sec"),
+        target_dir: Path = config.TRAIN_TEST_SPLIT_PATH,
         max_filesize_in_mb: int = 100, n_cols: int = 68, train_size: int = 2,
         test_size: int = 1):
     """ Iterates through all features files under 'config.WINDOW_FEATURES_PATH,
@@ -68,14 +68,18 @@ def window_files_train_test_split(
     for arr in all_arrays:
         arr.close()
 
-    np.save(target_dir.joinpath("train_identifiers"), train_identifiers)
-    np.save(target_dir.joinpath("test_identifiers"), test_identifiers)
+    sub_target_dir = target_dir.joinpath("identifiers")
+    sub_target_dir.mkdir()
+    np.save(sub_target_dir.joinpath("train"), train_identifiers)
+    np.save(sub_target_dir.joinpath("test"), test_identifiers)
 
 
-def get_train_test_splits(directory: Path = config.DATA_PATH.joinpath("TrainTestSplits_10sec")):
+def get_train_test_splits(directory: Path = config.TRAIN_TEST_SPLIT_PATH):
     KSS_THRESHOLD = 7
     test_data, train_data = [], []
     for file in directory.iterdir():
+        if file.is_dir():
+            continue
         arr = np.load(file=file)
         if "test" in file.name:
             test_data.append(arr)
@@ -98,7 +102,7 @@ def get_train_test_splits(directory: Path = config.DATA_PATH.joinpath("TrainTest
     return X_train, y_train, X_test, y_test
 
 
-def get_data_not_splitted(directory: Path = config.DATA_PATH.joinpath("TrainTestSplits_10sec")):
+def get_data_not_splitted(directory: Path = config.TRAIN_TEST_SPLIT_PATH):
     X_train, y_train, X_test, y_test = get_train_test_splits(directory=directory)
     # split in full data for CV
     X = np.concatenate([X_train, X_test])
@@ -107,14 +111,14 @@ def get_data_not_splitted(directory: Path = config.DATA_PATH.joinpath("TrainTest
 
 
 def get_identifier_array_train_test_split(
-        directory: Path = config.DATA_PATH.joinpath("TrainTestSplits_10sec")):
-    train_idents = np.load(directory.joinpath("train_identifiers.npy"))
-    test_idents = np.load(directory.joinpath("test_identifiers.npy"))
+        directory: Path = config.IDENTIFIER_PATH):
+    train_idents = np.load(directory.joinpath("train.npy"))
+    test_idents = np.load(directory.joinpath("test.npy"))
     return train_idents, test_idents
 
 
 def get_identifier_array_not_splitted(
-        directory: Path = config.DATA_PATH.joinpath("TrainTestSplits_10sec")):
+        directory: Path = config.IDENTIFIER_PATH):
     train_idents, test_idents = get_identifier_array_train_test_split(directory=directory)
     return np.concatenate([train_idents, test_idents])
 
@@ -123,6 +127,29 @@ def feature_array_to_df(arr: np.ndarray) -> pd.DataFrame:
     with open(config.FEATURE_NAMES_PATH) as fp:
         features_names = fp.read().split("\n")
     return pd.DataFrame(arr, columns=features_names)
+
+
+def get_session_idx(ids: np.array):
+    session_idx = []
+    for s_type, s_int in session_type_mapping.items():
+        idx = np.squeeze(np.argwhere(ids[:, 0] == s_int))
+        session_idx.append((idx, s_type))
+    return session_idx
+
+
+def get_subject_idx(ids: np.array):
+    subject_ids = set()
+    for file in config.WINDOW_FEATURES_PATH.iterdir():
+        if file.is_dir():
+            continue
+        s_type, s_id = filename_to_session_type_and_id(file)
+        subject_ids.add(s_id)
+
+    session_idx = []
+    for s_id in subject_ids:
+        idx = np.squeeze(np.argwhere(ids[:, 1] == s_id))
+        session_idx.append((idx, s_id))
+    return session_idx
 
 
 if __name__ == '__main__':
