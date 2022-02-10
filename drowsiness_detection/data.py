@@ -102,7 +102,7 @@ def get_train_test_splits(directory: Path = config.TRAIN_TEST_SPLIT_PATH):
     return X_train, y_train, X_test, y_test
 
 
-def get_data_not_splitted(directory: Path = config.TRAIN_TEST_SPLIT_PATH):
+def get_data_not_splitted(directory: Path = config.TEN_SEC_TRAIN_TEST_SPLIT_PATH):
     X_train, y_train, X_test, y_test = get_train_test_splits(directory=directory)
     # split in full data for CV
     X = np.concatenate([X_train, X_test])
@@ -111,14 +111,14 @@ def get_data_not_splitted(directory: Path = config.TRAIN_TEST_SPLIT_PATH):
 
 
 def get_identifier_array_train_test_split(
-        directory: Path = config.IDENTIFIER_PATH):
+        directory: Path = config.TEN_SEC_IDENTIFIER_PATH):
     train_idents = np.load(directory.joinpath("train.npy"))
     test_idents = np.load(directory.joinpath("test.npy"))
     return train_idents, test_idents
 
 
 def get_identifier_array_not_splitted(
-        directory: Path = config.IDENTIFIER_PATH):
+        directory: Path = config.TEN_SEC_IDENTIFIER_PATH):
     train_idents, test_idents = get_identifier_array_train_test_split(directory=directory)
     return np.concatenate([train_idents, test_idents])
 

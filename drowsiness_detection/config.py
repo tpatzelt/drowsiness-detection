@@ -1,14 +1,31 @@
 from pathlib import Path
 
-# DATA_PATH = Path(__file__).parent.parent.joinpath("data/")
-# PREPROCESSED_DATA_PATH = DATA_PATH.joinpath("preprocessed")
-
 DATA_PATH = Path("/home/tim/Windows/")
 WINDOW_DATA_PATH = DATA_PATH.joinpath("WindowData")
 WINDOW_LABEL_PATH = DATA_PATH.joinpath("WindowLabels")
 WINDOW_FEATURES_PATH = DATA_PATH.joinpath("WindowFeatures")
-DATA_FORMAT_PATH = DATA_PATH.joinpath("data_format.json")
-LABEL_FORMAT_PATH = DATA_PATH.joinpath("kss_labels_format.json")
-FEATURE_NAMES_PATH = DATA_PATH.joinpath("features_names.txt")
-TRAIN_TEST_SPLIT_PATH = DATA_PATH.joinpath("TrainTestSplits_10sec")
-IDENTIFIER_PATH = TRAIN_TEST_SPLIT_PATH.joinpath("identifiers")
+TRAIN_TEST_SPLIT_PATH = DATA_PATH.joinpath("TrainTestSplits")
+
+FEATURE_NAMES_PATH = WINDOW_FEATURES_PATH.joinpath("features_names.txt")
+DATA_FORMAT_PATH = WINDOW_DATA_PATH.joinpath("Format").joinpath("data_format.json")
+LABEL_FORMAT_PATH = WINDOW_LABEL_PATH.joinpath("Format").joinpath("kss_labels_format.json")
+
+TEN_SEC_WINDOW_DATA_PATH = WINDOW_DATA_PATH.joinpath("10_sec")
+TWENTY_SEC_WINDOW_DATA_PATH = WINDOW_DATA_PATH.joinpath("20_sec")
+SIXTY_SEC_WINDOW_DATA_PATH = WINDOW_DATA_PATH.joinpath("60_sec")
+
+TEN_SEC_WINDOW_LABEL_PATH = WINDOW_LABEL_PATH.joinpath("10_sec")
+TWENTY_SEC_WINDOW_LABEL_PATH = WINDOW_LABEL_PATH.joinpath("20_sec")
+SICTY_SEC_WINDOW_LABEL_PATH = WINDOW_LABEL_PATH.joinpath("60_sec")
+
+TEN_SEC_FEATURES_PATH = WINDOW_FEATURES_PATH.joinpath("10_sec_first_try")
+TWENTY_SEC_FEATURES_PATH = WINDOW_FEATURES_PATH.joinpath("20_sec")
+SIXTY_SEC_FEATURES_PATH = WINDOW_FEATURES_PATH.joinpath("60_sec")
+
+TEN_SEC_TRAIN_TEST_SPLIT_PATH = TRAIN_TEST_SPLIT_PATH.joinpath("10_sec")
+TWENTY_SEC_TRAIN_TEST_SPLIT_PATH = TRAIN_TEST_SPLIT_PATH.joinpath("20_sec")
+SIXTY_SEC_TRAIN_TEST_SPLIT_PATH = TRAIN_TEST_SPLIT_PATH.joinpath("60_sec")
+
+TEN_SEC_IDENTIFIER_PATH = TEN_SEC_TRAIN_TEST_SPLIT_PATH.joinpath("identifiers")
+TWENTY_SEC_IDENTIFIER_PATH = TWENTY_SEC_TRAIN_TEST_SPLIT_PATH.joinpath("identifiers")
+SIXTY_SEC_IDENTIFIER_PATH = SIXTY_SEC_TRAIN_TEST_SPLIT_PATH.joinpath("identifiers")
