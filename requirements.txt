@@ -6,3 +6,4 @@ tensorflow~=2.6.2
 click~=8.0.3
 prettytable~=3.0.0
 sacred~=0.8.2
+sklearn-evaluation~=0.5.7
