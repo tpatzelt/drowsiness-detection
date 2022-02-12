@@ -1,5 +1,7 @@
 from pathlib import Path
 
+SOURCES_ROOT_PATH = Path(__file__)
+
 DATA_PATH = Path("/home/tim/Windows/")
 WINDOW_DATA_PATH = DATA_PATH.joinpath("WindowData")
 WINDOW_LABEL_PATH = DATA_PATH.joinpath("WindowLabels")
