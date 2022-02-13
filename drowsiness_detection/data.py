@@ -139,7 +139,7 @@ def get_session_idx(ids: np.array):
 
 def get_subject_idx(ids: np.array):
     subject_ids = set()
-    for file in config.WINDOW_FEATURES_PATH.iterdir():
+    for file in config.TEN_SEC_FEATURES_PATH.iterdir():
         if file.is_dir():
             continue
         s_type, s_id = filename_to_session_type_and_id(file)

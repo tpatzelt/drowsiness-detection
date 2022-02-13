@@ -87,14 +87,15 @@ def show_frame_slider(data: np.array, n_frames: int = 60):
     return sframes, ax
 
 
-def plot_roc_over_n_folds(classifier, X, y, n_splits=6, fit_model=False):
+def plot_roc_over_n_folds(classifier, X, y, n_splits=6, fit_model=False, ax=None):
     cv = StratifiedKFold(n_splits=n_splits)
 
     tprs = []
     aucs = []
     mean_fpr = np.linspace(0, 1, 100)
 
-    fig, ax = plt.subplots()
+    if ax is None:
+        fig, ax = plt.subplots()
     for i, (train, test) in enumerate(cv.split(X, y)):
         if fit_model:
             classifier.fit(X[train], y[train])
@@ -142,27 +143,29 @@ def plot_roc_over_n_folds(classifier, X, y, n_splits=6, fit_model=False):
     ax.set(
         xlim=[-0.05, 1.05],
         ylim=[-0.05, 1.05],
-        title="Receiver operating characteristic example",
+        title=f"ROC for {classifier}",
     )
     ax.legend(loc="lower right")
-    plt.show()
+    # plt.show()
 
 
-def plot_roc_over_sessions(classifier, identifiers: np.ndarray, X: np.ndarray, y: np.ndarray):
+def plot_roc_over_sessions(classifier, identifiers: np.ndarray, X: np.ndarray, y: np.ndarray,
+                           ax=None):
     session_idx = get_session_idx(ids=identifiers)
     tprs = []
     aucs = []
     mean_fpr = np.linspace(0, 1, 100)
 
-    fig, ax = plt.subplots()
+    if ax is None:
+        fig, ax = plt.subplots()
     for indices, name in session_idx:
         viz = RocCurveDisplay.from_estimator(
             classifier,
             X[indices],
             y[indices],
             name="Session type: {}".format(name),
-            alpha=0.3,
-            lw=1,
+            # alpha=0.3,
+            # lw=1,
             ax=ax,
         )
         interp_tpr = np.interp(mean_fpr, viz.fpr, viz.tpr)
@@ -181,8 +184,8 @@ def plot_roc_over_sessions(classifier, identifiers: np.ndarray, X: np.ndarray, y
         mean_tpr,
         color="b",
         label=r"Mean ROC (AUC = %0.2f $\pm$ %0.2f)" % (mean_auc, std_auc),
-        lw=2,
-        alpha=0.8,
+        # lw=2,
+        # alpha=0.8,
     )
 
     std_tpr = np.std(tprs, axis=0)
@@ -200,19 +203,20 @@ def plot_roc_over_sessions(classifier, identifiers: np.ndarray, X: np.ndarray, y
     ax.set(
         xlim=[-0.05, 1.05],
         ylim=[-0.05, 1.05],
-        title="Receiver operating characteristic example",
+        title=f"ROC for {classifier}",
     )
     ax.legend(loc="lower right")
-    plt.show()
 
 
-def plot_roc_over_subjects(classifier, identifiers: np.ndarray, X: np.ndarray, y: np.ndarray):
+def plot_roc_over_subjects(classifier, identifiers: np.ndarray, X: np.ndarray, y: np.ndarray,
+                           ax=None):
     session_idx = get_subject_idx(ids=identifiers)
     tprs = []
     aucs = []
     mean_fpr = np.linspace(0, 1, 100)
 
-    fig, ax = plt.subplots()
+    if ax is None:
+        fig, ax = plt.subplots()
     for indices, name in session_idx:
         viz = RocCurveDisplay.from_estimator(
             classifier,
@@ -258,11 +262,10 @@ def plot_roc_over_subjects(classifier, identifiers: np.ndarray, X: np.ndarray, y
     ax.set(
         xlim=[-0.05, 1.05],
         ylim=[-0.05, 1.05],
-        title="Receiver operating characteristic example",
+        title=f"ROC for {classifier}",
     )
     ax.legend(loc="lower right")
     ax.legend().set_visible(False)
-    plt.show()
 
 
 def plot_search_results(grid):
