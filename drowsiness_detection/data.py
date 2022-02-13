@@ -24,7 +24,7 @@ def filename_to_session_type_and_id(filename: Path):
 def get_kss_labels_for_feature_file(feature_file_path):
     interpolated_kss_index = 2
     identifier = str(feature_file_path.stem)[-11:]
-    for label_file in config.WINDOW_LABEL_PATH.iterdir():
+    for label_file in config.TEN_SEC_WINDOW_LABEL_PATH.iterdir():
         if identifier in str(label_file):
             return np.load(label_file)[:, interpolated_kss_index]
     else:
@@ -32,7 +32,7 @@ def get_kss_labels_for_feature_file(feature_file_path):
 
 
 def window_files_train_test_split(
-        target_dir: Path = config.TRAIN_TEST_SPLIT_PATH,
+        target_dir: Path = config.TEN_SEC_TRAIN_TEST_SPLIT_PATH,
         max_filesize_in_mb: int = 100, n_cols: int = 68, train_size: int = 2,
         test_size: int = 1):
     """ Iterates through all features files under 'config.WINDOW_FEATURES_PATH,
@@ -53,7 +53,7 @@ def window_files_train_test_split(
                     range(train_size)]
     all_arrays = (*test_arrays, *train_arrays)
 
-    for feature_file in config.WINDOW_FEATURES_PATH.iterdir():
+    for feature_file in config.TEN_SEC_FEATURES_PATH.iterdir():
         sess_type, subject_id = filename_to_session_type_and_id(feature_file)
         features = np.load(feature_file)
         targets = get_kss_labels_for_feature_file(feature_file)
@@ -74,7 +74,7 @@ def window_files_train_test_split(
     np.save(sub_target_dir.joinpath("test"), test_identifiers)
 
 
-def get_train_test_splits(directory: Path = config.TRAIN_TEST_SPLIT_PATH):
+def get_train_test_splits(directory: Path = config.TEN_SEC_FEATURES_PATH):
     KSS_THRESHOLD = 7
     test_data, train_data = [], []
     for file in directory.iterdir():
@@ -153,4 +153,4 @@ def get_subject_idx(ids: np.array):
 
 
 if __name__ == '__main__':
-    window_files_train_test_split()
+    window_files_train_test_split(train_size=4, test_size=1)

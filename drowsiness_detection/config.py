@@ -4,7 +4,7 @@ SOURCES_ROOT_PATH = Path(__file__).parent
 
 DATA_PATH = Path("/home/tim/Windows/")
 WINDOW_DATA_PATH = DATA_PATH.joinpath("WindowData")
-WINDOW_LABEL_PATH = DATA_PATH.joinpath("WindowLabels")
+WINDOW_LABEL_PATH = DATA_PATH.joinpath("WindowLabels").joinpath("KSS")
 WINDOW_FEATURES_PATH = DATA_PATH.joinpath("WindowFeatures")
 TRAIN_TEST_SPLIT_PATH = DATA_PATH.joinpath("TrainTestSplits")
 

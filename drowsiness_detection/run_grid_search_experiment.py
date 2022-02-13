@@ -13,7 +13,7 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import RepeatedStratifiedKFold
 
 from drowsiness_detection import config
-from drowsiness_detection.data import get_data_not_splitted
+from drowsiness_detection.data import get_train_test_splits
 
 ex = Experiment("grid_search_kss")
 ex.observers.append(FileStorageObserver(Path(__file__).parent.parent.joinpath("logs")))
@@ -23,7 +23,7 @@ ex.observers.append(FileStorageObserver(Path(__file__).parent.parent.joinpath("l
 def base():
     data_id = "10_sec"
     cross_val_params = {
-        "n_splits": 2,
+        "n_splits": 4,
         "n_repeats": 1
     }
     grid_search_params = {
@@ -64,14 +64,14 @@ def random_forest():
 
 def parse_data_id(data_id: str):
     if data_id == "10_sec":
-        X, y = get_data_not_splitted(config.TEN_SEC_TRAIN_TEST_SPLIT_PATH)
+        X_train, y_train, _, _ = get_train_test_splits(config.TEN_SEC_TRAIN_TEST_SPLIT_PATH)
     elif data_id == "20_sec":
-        X, y = get_data_not_splitted(config.TWENTY_SEC_TRAIN_TEST_SPLIT_PATH)
+        X_train, y_train, _, _ = get_train_test_splits(config.TWENTY_SEC_TRAIN_TEST_SPLIT_PATH)
     elif data_id == "60_sec":
-        X, y = get_data_not_splitted(config.SIXTY_SEC_TRAIN_TEST_SPLIT_PATH)
+        X_train, y_train, _, _ = get_train_test_splits(config.SIXTY_SEC_TRAIN_TEST_SPLIT_PATH)
     else:
         raise ValueError
-    return X, y
+    return X_train, y_train
 
 
 def parse_model_name(model_name: str):
