@@ -153,4 +153,6 @@ def get_subject_idx(ids: np.array):
 
 
 if __name__ == '__main__':
+    import random
+    random.seed(42)
     window_files_train_test_split(train_size=4, test_size=1)
