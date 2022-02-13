@@ -1,3 +1,7 @@
+from sklearnex import patch_sklearn
+
+patch_sklearn()
+
 import pickle
 from pathlib import Path
 
@@ -25,7 +29,8 @@ def base():
     grid_search_params = {
         "scoring": "roc_auc",
         "n_jobs": -1,
-        "error_score": 0
+        "error_score": 0,
+        "verbose": 1
     }
     model_params = {
         "name": None,
@@ -41,6 +46,19 @@ def logistic_regression():
             "max_iter": [100],
             "C": [1, 2]
         }
+    }
+
+
+@ex.named_config
+def random_forest():
+    model_params = {
+        "name": "RandomForest",
+        "param_grid": {
+            'n_estimators': [100, 1000],
+            'max_depth': [10, 50, 100],
+            'min_samples_leaf': [1, 10],
+            "max_features": ['sqrt'],
+            'criterion': ['gini', 'entropy']}
     }
 
 

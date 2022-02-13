@@ -7,3 +7,4 @@ click~=8.0.3
 prettytable~=3.0.0
 sacred~=0.8.2
 sklearn-evaluation~=0.5.7
+scikit-learn-intelex~=2021.5.3
