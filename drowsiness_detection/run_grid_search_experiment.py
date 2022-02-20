@@ -30,7 +30,7 @@ def base():
         "scoring": "roc_auc",
         "n_jobs": -1,
         "error_score": 0,
-        "verbose": 1
+        "verbose": 2
     }
     model_params = {
         "name": None,
@@ -43,8 +43,10 @@ def logistic_regression():
     model_params = {
         "name": "LogisticRegression",
         "param_grid": {
-            "max_iter": [100],
-            "C": [1, 2]
+            "max_iter": [1000, 2500],
+            "C": [.01, .1, 1, 10, 100],
+            "solver": ["newton-cg", "liblinear"],
+            "penalty": ["l2"]
         }
     }
 
@@ -52,12 +54,12 @@ def logistic_regression():
 @ex.named_config
 def random_forest():
     model_params = {
-        "name": "RandomForest",
+        "name": "RandomForestClassifier",
         "param_grid": {
-            'n_estimators': [100, 1000],
+            'n_estimators': [1000,1500, 2000],
             'max_depth': [10, 50, 100],
             'min_samples_leaf': [1, 10],
-            "max_features": ['sqrt'],
+            "max_features": ['sqrt', 'log2'],
             'criterion': ['gini', 'entropy']}
     }
 
@@ -101,5 +103,5 @@ def run(data_id: str, cross_val_params: dict, grid_search_params: dict, model_pa
     result_path = Path("grid_result.pkl")
     with open(result_path, "wb") as fp:
         pickle.dump(file=fp, obj=grid_result)
-    ex.add_artifact(result_path, name="grid_search_result")
+    ex.add_artifact(result_path, name="grid_search_result.pkl")
     result_path.unlink()
