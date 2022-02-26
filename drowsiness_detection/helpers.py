@@ -5,9 +5,6 @@ import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
 import numpy as np
 import pandas as pd
-import tensorflow as tf
-import tensorflow.keras as keras
-from tensorflow.keras import backend as K
 
 
 def print_nan_intersections(df: pd.DataFrame):
@@ -23,20 +20,12 @@ def print_nan_intersections(df: pd.DataFrame):
         print(f"Column {column} has {len(unique_nans)} nans that appear in no other column.")
 
 
-def root_mean_squared_error(y_true, y_pred):
-    return K.sqrt(K.mean(K.square(y_pred - y_true), axis=-1))
-
 
 def digitize(arr, shift: float = .5, label_start_index: int = 1):
     bins = [x + shift for x in range(1, 9)]
     return np.digitize(arr, bins=bins) + label_start_index
 
 
-def one_hot_like_to_label(arr, threshold=.5):
-    threshold = keras.backend.constant(threshold)
-    y_pred_sum = keras.backend.sum(keras.backend.cast(keras.backend.greater(
-        arr, threshold), dtype=tf.int64), axis=1)
-    return y_pred_sum
 
 
 def label_to_one_hot_like(arr, k=9):
