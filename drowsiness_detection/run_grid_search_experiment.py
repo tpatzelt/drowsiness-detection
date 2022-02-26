@@ -49,30 +49,38 @@ def base():
 @ex.named_config
 def logistic_regression():
     grid_search_params = {
-        "n_iter": 5,
-        "max_budget": 100,
+        "n_iter": 20,
+        "max_budget": 5000,
         "resource_name": "max_iter",
         "resource_type": int
     }
     hyperparameter_specs = [dict(name="UniformFloatHyperparameter",
                                  kwargs=dict(name="C", lower=.001, upper=100, log=True)),
                             dict(name="CategoricalHyperparameter",
-                                 kwargs=dict(name="solver", choices=["newton-cg", "liblinear"])),
+                                 kwargs=dict(name="solver", choices=["saga"])),
                             dict(name="CategoricalHyperparameter",
-                                 kwargs=dict(name="penalty", choices=["l2"]))]
+                                 kwargs=dict(name="penalty",
+                                             choices=["elasticnet", "l1", "l2", None]))]
     model_name = "LogisticRegression"
 
 
 @ex.named_config
 def random_forest():
-    model_params = {
-        "name": "RandomForestClassifier",
-        "param_grid": {
-            'max_depth': [10, 50, 100],
-            'min_samples_leaf': [1, 10],
-            "max_features": ['sqrt', 'log2'],
-            'criterion': ['gini', 'entropy']}
+    model_name = "RandomForestClassifier"
+    grid_search_params = {
+        "n_iter": 20,
+        "max_budget": 3000,
+        "resource_name": "n_estimators",
+        "resource_type": int
     }
+    hyperparameter_specs = [
+        dict(name="CategoricalHyperparameter",
+             kwargs=dict(name="criterion", choices=["gini", "entropy"])),
+        dict(name="UniformIntegerHyperparameter",
+             kwargs=dict(name="max_depth", lower=2, upper=100, log=False)),
+        dict(name="CategoricalHyperparameter",
+             kwargs=dict(name="max_features", choices=["sqrt", "log2"])),
+    ]
 
 
 def parse_model_name(model_name: str):
