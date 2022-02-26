@@ -8,3 +8,4 @@ prettytable~=3.0.0
 sacred~=0.8.2
 sklearn-evaluation~=0.5.7
 scikit-learn-intelex~=2021.5.3
+hpbandster-sklearn~=2.0.1
