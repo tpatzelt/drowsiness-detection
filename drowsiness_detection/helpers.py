@@ -1,6 +1,8 @@
 from functools import reduce
 from pathlib import Path
 
+import ConfigSpace as CS
+import ConfigSpace.hyperparameters as CSH
 import coral_ordinal as coral
 import numpy as np
 import pandas as pd
@@ -98,3 +100,11 @@ def name_generator(base_name: str) -> str:
     while True:
         yield base_name + "_" + str(i)
         i += 1
+
+
+def spec_to_config_space(specs):
+    cs = CS.ConfigurationSpace()
+    for spec in specs:
+        to_add = getattr(CSH, spec["name"])
+        cs.add_hyperparameter(to_add(**spec["kwargs"]))
+    return cs

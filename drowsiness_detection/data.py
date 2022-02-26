@@ -9,9 +9,6 @@ from drowsiness_detection.helpers import binarize, ArrayWrapper, name_generator
 
 session_type_mapping = dict(a=1, b=2, e=3, s=4)
 
-with open(config.PATHS.FEATURE_NAMES_FILE) as fp:
-    FEATURE_NAMES = fp.read().split("\n")
-
 
 def filename_to_session_type_and_id(filename: Path):
     a = filename.name
@@ -157,6 +154,34 @@ def drop_by_identifier(X, y, identifiers: np.ndarray, exclude_by: int):
         raise ValueError("Shapes do not match.")
     X = X[identifiers[:, 0] != exclude_by]
     y = y[identifiers[:, 0] != exclude_by]
+    return X, y
+
+
+def get_feature_data(data_path: Path = config.PATHS.WINDOW_FEATURES):
+    """Loads all files under data_path, adds the session type, subject id and kss score as new columns. """
+    all_arrays = []
+    for feature_file in data_path.iterdir():
+        sess_type, subject_id = filename_to_session_type_and_id(feature_file)
+        features = np.load(feature_file)
+        targets = get_kss_labels_for_feature_file(feature_file)
+        sess_types = np.repeat(session_type_mapping[sess_type], len(targets))
+        subject_ids = np.repeat(subject_id, len(targets))
+        merged_arr = np.c_[features, targets, sess_types, subject_ids]
+        all_arrays.append(merged_arr)
+    return np.concatenate(all_arrays)
+
+
+def preprocess_feature_data(feature_data: np.ndarray, exclude_sess_type: int):
+    """Preprocessing the feature data includes removing NaNs,
+    binarize kss scores and split into features and targets."""
+    # col -3 is targets, -2 is sess type and -1 is subject id
+    KSS_THRESHOLD = 7
+    feature_data = np.nan_to_num(feature_data)
+    feature_data[:, -3] = binarize(feature_data[:, -3], threshold=KSS_THRESHOLD)
+    # remove one session type
+    feature_data = feature_data[feature_data[:, -2] != exclude_sess_type]
+    X = feature_data[:, :-3]
+    y = feature_data[:, -3]
     return X, y
 
 

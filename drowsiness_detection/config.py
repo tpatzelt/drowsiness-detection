@@ -2,7 +2,7 @@ from pathlib import Path
 
 SOURCES_ROOT_PATH = Path(__file__).parent
 
-BASE_PATH = Path("/media/tim/My Passport/drowsiness_data/Windows")
+BASE_PATH = Path("/home/tim/Windows")
 PATHS = None
 
 
@@ -32,4 +32,4 @@ def set_paths(frequency: int, seconds: int):
     PATHS = Paths(frequency_string=str(frequency) + "_Hz", seconds_string=str(seconds) + "_sec")
 
 
-set_paths(30, 10)
+set_paths(1, 1)
