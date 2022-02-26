@@ -2,32 +2,34 @@ from pathlib import Path
 
 SOURCES_ROOT_PATH = Path(__file__).parent
 
-DATA_PATH = Path("/home/tim/Windows/")
-WINDOW_DATA_PATH = DATA_PATH.joinpath("WindowData")
-WINDOW_LABEL_PATH = DATA_PATH.joinpath("WindowLabels").joinpath("KSS")
-WINDOW_FEATURES_PATH = DATA_PATH.joinpath("WindowFeatures")
-TRAIN_TEST_SPLIT_PATH = DATA_PATH.joinpath("TrainTestSplits")
+BASE_PATH = Path("/media/tim/My Passport/drowsiness_data/Windows")
+PATHS = None
 
-FEATURE_NAMES_PATH = WINDOW_FEATURES_PATH.joinpath("features_names.txt")
-DATA_FORMAT_PATH = WINDOW_DATA_PATH.joinpath("Format").joinpath("data_format.json")
-LABEL_FORMAT_PATH = WINDOW_LABEL_PATH.joinpath("Format").joinpath("kss_labels_format.json")
 
-TEN_SEC_WINDOW_DATA_PATH = WINDOW_DATA_PATH.joinpath("10_sec")
-TWENTY_SEC_WINDOW_DATA_PATH = WINDOW_DATA_PATH.joinpath("20_sec")
-SIXTY_SEC_WINDOW_DATA_PATH = WINDOW_DATA_PATH.joinpath("60_sec")
+class Paths:
+    """Object holding all data paths."""
 
-TEN_SEC_WINDOW_LABEL_PATH = WINDOW_LABEL_PATH.joinpath("10_sec")
-TWENTY_SEC_WINDOW_LABEL_PATH = WINDOW_LABEL_PATH.joinpath("20_sec")
-SICTY_SEC_WINDOW_LABEL_PATH = WINDOW_LABEL_PATH.joinpath("60_sec")
+    def __init__(self, frequency_string: str, seconds_string: str, label_string: str = "KSS"):
+        self.DATA = BASE_PATH.joinpath("Windows_" + frequency_string)
+        self.WINDOW_DATA = self.DATA.joinpath("WindowData").joinpath(seconds_string)
+        self.LABEL_DATA = self.DATA.joinpath("WindowLabels").joinpath(label_string).joinpath(
+            seconds_string)
+        self.TRAIN_TEST_SPLIT = self.DATA.joinpath("TrainTestSplits").joinpath(seconds_string)
+        self.SPLIT_IDENTIFIER = self.TRAIN_TEST_SPLIT.joinpath("identifiers")
 
-TEN_SEC_FEATURES_PATH = WINDOW_FEATURES_PATH.joinpath("10_sec_first_try")
-TWENTY_SEC_FEATURES_PATH = WINDOW_FEATURES_PATH.joinpath("20_sec")
-SIXTY_SEC_FEATURES_PATH = WINDOW_FEATURES_PATH.joinpath("60_sec")
+        self.DATA_FORMAT_FILE = self.DATA.joinpath("WindowData").joinpath("Format").joinpath(
+            "data_format.json")
+        self.LABEL_FORMAT_FILE = self.DATA.joinpath("Format").joinpath("kss_Label_format.json")
+        self.FEATURE_NAMES_FILE = self.DATA.joinpath("WindowFeatures").joinpath(
+            "feature_names.txt")
 
-TEN_SEC_TRAIN_TEST_SPLIT_PATH = TRAIN_TEST_SPLIT_PATH.joinpath("10_sec")
-TWENTY_SEC_TRAIN_TEST_SPLIT_PATH = TRAIN_TEST_SPLIT_PATH.joinpath("20_sec")
-SIXTY_SEC_TRAIN_TEST_SPLIT_PATH = TRAIN_TEST_SPLIT_PATH.joinpath("60_sec")
+        self.WINDOW_FEATURES = self.DATA.joinpath("WindowFeatures").joinpath(seconds_string)
 
-TEN_SEC_IDENTIFIER_PATH = TEN_SEC_TRAIN_TEST_SPLIT_PATH.joinpath("identifiers")
-TWENTY_SEC_IDENTIFIER_PATH = TWENTY_SEC_TRAIN_TEST_SPLIT_PATH.joinpath("identifiers")
-SIXTY_SEC_IDENTIFIER_PATH = SIXTY_SEC_TRAIN_TEST_SPLIT_PATH.joinpath("identifiers")
+
+def set_paths(frequency: int, seconds: int):
+    "Switch function to change data sources."
+    global PATHS
+    PATHS = Paths(frequency_string=str(frequency) + "_Hz", seconds_string=str(seconds) + "_sec")
+
+
+set_paths(30, 10)
