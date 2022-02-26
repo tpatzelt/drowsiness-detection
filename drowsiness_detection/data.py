@@ -9,7 +9,7 @@ from drowsiness_detection.helpers import binarize, ArrayWrapper, name_generator
 
 session_type_mapping = dict(a=1, b=2, e=3, s=4)
 
-with open(config.FEATURE_NAMES_PATH) as fp:
+with open(config.PATHS.FEATURE_NAMES_FILE) as fp:
     FEATURE_NAMES = fp.read().split("\n")
 
 
@@ -24,7 +24,7 @@ def filename_to_session_type_and_id(filename: Path):
 def get_kss_labels_for_feature_file(feature_file_path):
     interpolated_kss_index = 2
     identifier = str(feature_file_path.stem)[-11:]
-    for label_file in config.TEN_SEC_WINDOW_LABEL_PATH.iterdir():
+    for label_file in config.PATHS.LABEL_DATA.iterdir():
         if identifier in str(label_file):
             return np.load(label_file)[:, interpolated_kss_index]
     else:
@@ -32,8 +32,8 @@ def get_kss_labels_for_feature_file(feature_file_path):
 
 
 def window_files_train_test_split(
-        target_dir: Path = config.TEN_SEC_TRAIN_TEST_SPLIT_PATH,
-        max_filesize_in_mb: int = 100, n_cols: int = 68, train_size: int = 2,
+        target_dir: Path = config.PATHS.TRAIN_TEST_SPLIT,
+        max_filesize_in_mb: int = 100, n_cols: int = 786, train_size: int = 2,
         test_size: int = 1):
     """ Iterates through all features files under 'config.WINDOW_FEATURES_PATH,
      fetches the label file and writes each row randomly to either the test or
@@ -53,7 +53,7 @@ def window_files_train_test_split(
                     range(train_size)]
     all_arrays = (*test_arrays, *train_arrays)
 
-    for feature_file in config.TEN_SEC_FEATURES_PATH.iterdir():
+    for feature_file in config.PATHS.WINDOW_FEATURES.iterdir():
         sess_type, subject_id = filename_to_session_type_and_id(feature_file)
         features = np.load(feature_file)
         targets = get_kss_labels_for_feature_file(feature_file)
@@ -74,10 +74,10 @@ def window_files_train_test_split(
     np.save(sub_target_dir.joinpath("test"), test_identifiers)
 
 
-def get_train_test_splits(directory: Path = config.TEN_SEC_FEATURES_PATH):
+def get_train_test_splits(directory: Path = config.PATHS.TRAIN_TEST_SPLIT):
     KSS_THRESHOLD = 7
     test_data, train_data = [], []
-    for file in directory.iterdir():
+    for file in sorted(directory.iterdir()):
         if file.is_dir():
             continue
         arr = np.load(file=file)
@@ -102,7 +102,7 @@ def get_train_test_splits(directory: Path = config.TEN_SEC_FEATURES_PATH):
     return X_train, y_train, X_test, y_test
 
 
-def get_data_not_splitted(directory: Path = config.TEN_SEC_TRAIN_TEST_SPLIT_PATH):
+def get_data_not_splitted(directory: Path = config.PATHS.TRAIN_TEST_SPLIT):
     X_train, y_train, X_test, y_test = get_train_test_splits(directory=directory)
     # split in full data for CV
     X = np.concatenate([X_train, X_test])
@@ -111,22 +111,22 @@ def get_data_not_splitted(directory: Path = config.TEN_SEC_TRAIN_TEST_SPLIT_PATH
 
 
 def get_identifier_array_train_test_split(
-        directory: Path = config.TEN_SEC_IDENTIFIER_PATH):
+        directory: Path = config.PATHS.SPLIT_IDENTIFIER):
     train_idents = np.load(directory.joinpath("train.npy"))
     test_idents = np.load(directory.joinpath("test.npy"))
     return train_idents, test_idents
 
 
 def get_identifier_array_not_splitted(
-        directory: Path = config.TEN_SEC_IDENTIFIER_PATH):
+        directory: Path = config.PATHS.SPLIT_IDENTIFIER):
     train_idents, test_idents = get_identifier_array_train_test_split(directory=directory)
     return np.concatenate([train_idents, test_idents])
 
 
 def feature_array_to_df(arr: np.ndarray) -> pd.DataFrame:
-    with open(config.FEATURE_NAMES_PATH) as fp:
-        features_names = fp.read().split("\n")
-    return pd.DataFrame(arr, columns=features_names)
+    with open(config.PATHS.FEATURE_NAMES_FILE) as fp:
+        feature_names = fp.read().split("\n")
+    return pd.DataFrame(arr, columns=feature_names)
 
 
 def get_session_idx(ids: np.array):
@@ -139,7 +139,7 @@ def get_session_idx(ids: np.array):
 
 def get_subject_idx(ids: np.array):
     subject_ids = set()
-    for file in config.TEN_SEC_FEATURES_PATH.iterdir():
+    for file in config.PATHS.WINDOW_FEATURES.iterdir():
         if file.is_dir():
             continue
         s_type, s_id = filename_to_session_type_and_id(file)
@@ -152,7 +152,17 @@ def get_subject_idx(ids: np.array):
     return session_idx
 
 
+def drop_by_identifier(X, y, identifiers: np.ndarray, exclude_by: int):
+    if X.shape[0] != identifiers.shape[0] or y.shape[0] != identifiers.shape[0]:
+        raise ValueError("Shapes do not match.")
+    X = X[identifiers[:, 0] != exclude_by]
+    y = y[identifiers[:, 0] != exclude_by]
+    return X, y
+
+
 if __name__ == '__main__':
     import random
+
+    config.set_paths(30, 10)
     random.seed(42)
     window_files_train_test_split(train_size=4, test_size=1)
