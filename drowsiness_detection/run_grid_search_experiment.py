@@ -13,6 +13,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import RepeatedStratifiedKFold
 from drowsiness_detection import config
+from sklearn.metrics import accuracy_score, roc_auc_score
 
 from drowsiness_detection.data import session_type_mapping, get_feature_data, \
     preprocess_feature_data
@@ -57,10 +58,10 @@ def logistic_regression():
     hyperparameter_specs = [dict(name="UniformFloatHyperparameter",
                                  kwargs=dict(name="C", lower=.001, upper=100, log=True)),
                             dict(name="CategoricalHyperparameter",
-                                 kwargs=dict(name="solver", choices=["saga"])),
+                                 kwargs=dict(name="solver", choices=["liblinear"])),
                             dict(name="CategoricalHyperparameter",
                                  kwargs=dict(name="penalty",
-                                             choices=["elasticnet", "l1", "l2", None]))]
+                                             choices=["l1", "l2"]))]
     model_name = "LogisticRegression"
 
 
@@ -128,6 +129,15 @@ def run(recording_frequency: int, window_in_sec: int, cross_val_params: dict,
     # log best model
     ex.info[grid_result.scoring] = float(grid_result.best_score_)
     ex.info["best_params"] = grid_result.best_params_
+
+    # log metrics on test set
+    y_pred = grid_result.best_estimator_.predict(X_test)
+    test_acc = accuracy_score(y_test, y_pred)
+    y_pred_scores = grid_result.best_estimator_.predict_proba(X_test)[:,
+                    1]  # scores need to be probs. for class with greater label, i.e. 1.
+    test_roc_auc = roc_auc_score(y_test, y_pred_scores)
+    ex.info["test_accuracy"] = float(test_acc)
+    ex.info["test_roc_auc"] = test_roc_auc
 
     # save all search results
     result_path = Path("search_result.pkl")
