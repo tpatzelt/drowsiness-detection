@@ -3,7 +3,6 @@ from pathlib import Path
 
 import ConfigSpace as CS
 import ConfigSpace.hyperparameters as CSH
-import coral_ordinal as coral
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -47,11 +46,6 @@ def label_to_one_hot_like(arr, k=9):
         one_hots[i, :element] = 1
     return one_hots
 
-
-def ordinal_to_label(arr):
-    probs = pd.DataFrame(coral.ordinal_softmax(arr).numpy())
-    labels_v1 = probs.idxmax(axis=1).values
-    return labels_v1
 
 
 def binarize(arr: np.ndarray, threshold: float) -> np.ndarray:
