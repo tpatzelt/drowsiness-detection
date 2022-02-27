@@ -114,7 +114,6 @@ def run(recording_frequency: int, window_in_sec: int, cross_val_params: dict,
     # normalization
     scaler = MinMaxScaler()
     X_train = scaler.fit_transform(X=X_train)
-    X_test = scaler.transform(X_test)
 
     # set up hyperparameter tuning
     cv = RepeatedStratifiedKFold(**cross_val_params)
@@ -130,7 +129,15 @@ def run(recording_frequency: int, window_in_sec: int, cross_val_params: dict,
     ex.info[grid_result.scoring] = float(grid_result.best_score_)
     ex.info["best_params"] = grid_result.best_params_
 
+    # save all search results
+    result_path = Path("search_result.pkl")
+    with open(result_path, "wb") as fp:
+        pickle.dump(file=fp, obj=grid_result)
+    ex.add_artifact(result_path, name="search_result.pkl")
+    result_path.unlink()
+
     # log metrics on test set
+    X_test = scaler.transform(X_test)
     y_pred = grid_result.best_estimator_.predict(X_test)
     test_acc = accuracy_score(y_test, y_pred)
     y_pred_scores = grid_result.best_estimator_.predict_proba(X_test)[:,
@@ -138,10 +145,3 @@ def run(recording_frequency: int, window_in_sec: int, cross_val_params: dict,
     test_roc_auc = roc_auc_score(y_test, y_pred_scores)
     ex.info["test_accuracy"] = float(test_acc)
     ex.info["test_roc_auc"] = test_roc_auc
-
-    # save all search results
-    result_path = Path("search_result.pkl")
-    with open(result_path, "wb") as fp:
-        pickle.dump(file=fp, obj=grid_result)
-    ex.add_artifact(result_path, name="search_result.pkl")
-    result_path.unlink()
