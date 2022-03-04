@@ -1,6 +1,10 @@
 from sklearnex import patch_sklearn
 
 patch_sklearn()
+# explicitly require this experimental feature
+from sklearn.experimental import enable_halving_search_cv  # noqa
+# now you can import normally from model_selection
+from sklearn.model_selection import HalvingRandomSearchCV
 from sklearn.model_selection import train_test_split
 import pickle
 from drowsiness_detection.helpers import spec_to_config_space
@@ -33,6 +37,7 @@ def base():
         "n_repeats": 1
     }
     grid_search_params = {
+        "factor": None,
         "n_iter": None,
         "max_budget": None,
         "optimizer": "bohb",
@@ -69,10 +74,9 @@ def logistic_regression():
 def random_forest():
     model_name = "RandomForestClassifier"
     grid_search_params = {
-        "n_iter": 20,
-        "max_budget": 3000,
-        "resource_name": "n_estimators",
-        "resource_type": int
+        "factor": 3,
+        "max_resources": 3000,
+        "resource": "n_estimators",
     }
     hyperparameter_specs = [
         dict(name="CategoricalHyperparameter",
@@ -118,12 +122,14 @@ def run(recording_frequency: int, window_in_sec: int, cross_val_params: dict,
     # set up hyperparameter tuning
     cv = RepeatedStratifiedKFold(**cross_val_params)
     param_distribution = spec_to_config_space(specs=hyperparameter_specs)
-    grid_search = HpBandSterSearchCV(
+    hp_search = HpBandSterSearchCV(
         estimator=model, param_distributions=param_distribution, cv=cv,
         **grid_search_params)
+    hp_search = HalvingRandomSearchCV(estimator=model, param_distributions=param_distribution,
+                                      resource=resource, max_resources=)
 
     # run hyperband
-    grid_result = grid_search.fit(X_train, y_train)
+    grid_result = hp_search.fit(X_train, y_train)
 
     # log best model
     ex.info[grid_result.scoring] = float(grid_result.best_score_)
