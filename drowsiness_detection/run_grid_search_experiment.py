@@ -36,8 +36,8 @@ def base():
         "n_iter": None,
         "max_budget": None,
         "optimizer": "bohb",
-        "scoring": "roc_auc",
-        "n_jobs": -1,
+        "scoring": "accuracy",
+        "n_jobs": 7,
         "error_score": 0,
         "verbose": 1
     }
