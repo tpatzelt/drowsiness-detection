@@ -73,11 +73,11 @@ def logistic_regression():
         "scoring": "accuracy",
     }
     hyperparameter_specs = [dict(name="UniformFloatHyperparameter",
-                                 kwargs=dict(name="C", lower=.001, upper=100, log=True)),
+                                 kwargs=dict(name="classifier__C", lower=.001, upper=100, log=True)),
                             dict(name="CategoricalHyperparameter",
-                                 kwargs=dict(name="solver", choices=["liblinear"])),
+                                 kwargs=dict(name="classifier__solver", choices=["liblinear"])),
                             dict(name="CategoricalHyperparameter",
-                                 kwargs=dict(name="penalty",
+                                 kwargs=dict(name="classifier__penalty",
                                              choices=["l1", "l2"]))]
     model_name = "LogisticRegression"
 
@@ -88,16 +88,16 @@ def random_forest():
     grid_search_params = {
         "factor": 3,
         "max_resources": 3000,
-        "resource": "n_estimators",
+        "resource": 'classifier__n_estimators',
         "scoring": "accuracy",
     }
     hyperparameter_specs = [
         dict(name="CategoricalHyperparameter",
-             kwargs=dict(name="criterion", choices=["gini", "entropy"])),
+             kwargs=dict(name="classifier__criterion", choices=["gini", "entropy"])),
         dict(name="UniformIntegerHyperparameter",
-             kwargs=dict(name="max_depth", lower=2, upper=100, log=False)),
+             kwargs=dict(name="classifier__max_depth", lower=2, upper=100, log=False)),
         dict(name="CategoricalHyperparameter",
-             kwargs=dict(name="max_features", choices=["sqrt", "log2"])),
+             kwargs=dict(name="classifier__max_features", choices=["sqrt", "log2"])),
     ]
 
 
@@ -132,6 +132,7 @@ def run(recording_frequency: int, window_in_sec: int, n_inner_splits: int, n_out
     outer_cv = KFold(n_splits=n_outer_splits, shuffle=True, random_state=seed)
 
     pipe = Pipeline([("scaler", MinMaxScaler()), ("classifier", model)])
+    print(pipe.get_params().keys())
     param_distribution = spec_to_config_space(specs=hyperparameter_specs)
     search = HalvingRandomSearchCV(estimator=pipe,
                                    param_distributions=param_distribution.get_hyperparameters_dict(),
