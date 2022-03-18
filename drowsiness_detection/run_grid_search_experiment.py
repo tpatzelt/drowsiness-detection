@@ -37,7 +37,7 @@ def base():
         "max_resources": None,
         "resource": None,
         "scoring": None,
-        "n_jobs": 7,
+        "n_jobs": -1,
         "error_score": "raise",
         "verbose": 1
     }
@@ -89,6 +89,7 @@ def random_forest():
         "factor": 3,
         "max_resources": 3000,
         "resource": "n_estimators",
+        "scoring": "accuracy",
     }
     hyperparameter_specs = [
         dict(name="CategoricalHyperparameter",
