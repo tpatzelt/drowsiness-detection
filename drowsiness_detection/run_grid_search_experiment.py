@@ -5,19 +5,18 @@ patch_sklearn()
 from sklearn.experimental import enable_halving_search_cv  # noqa
 # now you can import normally from model_selection
 from sklearn.model_selection import HalvingRandomSearchCV
-from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
 import pickle
 from drowsiness_detection.helpers import spec_to_config_space
-from hpbandster_sklearn import HpBandSterSearchCV
+from sklearn.dummy import DummyClassifier
 from sklearn.preprocessing import MinMaxScaler
 from pathlib import Path
 from sacred import Experiment
 from sacred.observers import FileStorageObserver
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import RepeatedStratifiedKFold
+from sklearn.model_selection import KFold, cross_val_score
 from drowsiness_detection import config
-from sklearn.metrics import accuracy_score, roc_auc_score
 
 from drowsiness_detection.data import session_type_mapping, get_feature_data, \
     preprocess_feature_data
@@ -29,21 +28,17 @@ ex.observers.append(FileStorageObserver(Path(__file__).parent.parent.joinpath("l
 @ex.config
 def base():
     seed = 123
-    test_size = .2
     recording_frequency = None
     window_in_sec = None
-    cross_val_params = {
-        "n_splits": 4,
-        "n_repeats": 1
-    }
+    n_inner_splits = 3
+    n_outer_splits = 3
     grid_search_params = {
         "factor": None,
-        "n_iter": None,
-        "max_budget": None,
-        "optimizer": "bohb",
-        "scoring": "accuracy",
+        "max_resources": None,
+        "resource": None,
+        "scoring": None,
         "n_jobs": 7,
-        "error_score": 0,
+        "error_score": "raise",
         "verbose": 1
     }
     model_name = None
@@ -53,12 +48,29 @@ def base():
 
 
 @ex.named_config
+def dummy_classification():
+    grid_search_params = {
+        "factor": 3,
+        "max_resources": 100,  # "auto",
+        "resource": "n_samples",
+        "scoring": "accuracy",
+    }
+    hyperparameter_specs = [
+        dict(name="CategoricalHyperparameter",
+             kwargs=dict(name="classifier__strategy",
+                         choices=["most_frequent", "prior",
+                                  "stratified", "uniform"])),
+    ]
+    model_name = "DummyClassifier"
+
+
+@ex.named_config
 def logistic_regression():
     grid_search_params = {
-        "n_iter": 20,
-        "max_budget": 5000,
-        "resource_name": "max_iter",
-        "resource_type": int
+        "factor": 3,
+        "max_resources": "auto",
+        "resource": "n_samples",
+        "scoring": "accuracy",
     }
     hyperparameter_specs = [dict(name="UniformFloatHyperparameter",
                                  kwargs=dict(name="C", lower=.001, upper=100, log=True)),
@@ -93,15 +105,17 @@ def parse_model_name(model_name: str):
         model = RandomForestClassifier()
     elif model_name == "LogisticRegression":
         model = LogisticRegression()
+    elif model_name == "DummyClassifier":
+        model = DummyClassifier()
     else:
         raise ValueError
     return model
 
 
 @ex.automain
-def run(recording_frequency: int, window_in_sec: int, cross_val_params: dict,
+def run(recording_frequency: int, window_in_sec: int, n_inner_splits: int, n_outer_splits: int,
         grid_search_params: dict, model_name: str, exclude_by: str, hyperparameter_specs: dict,
-        test_size, seed):
+        seed):
     # set up global paths and cache dir for pipeline
     config.set_paths(frequency=recording_frequency, seconds=window_in_sec)
 
@@ -112,42 +126,27 @@ def run(recording_frequency: int, window_in_sec: int, cross_val_params: dict,
     data = get_feature_data(data_path=config.PATHS.WINDOW_FEATURES)
     X, y = preprocess_feature_data(feature_data=data,
                                    exclude_sess_type=session_type_mapping[exclude_by])
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
-                                                        random_state=seed)
 
-    # normalization
-    scaler = MinMaxScaler()
-    X_train = scaler.fit_transform(X=X_train)
+    inner_cv = KFold(n_splits=n_inner_splits, shuffle=True, random_state=seed)
+    outer_cv = KFold(n_splits=n_outer_splits, shuffle=True, random_state=seed)
 
-    # set up hyperparameter tuning
-    cv = RepeatedStratifiedKFold(**cross_val_params)
+    pipe = Pipeline([("scaler", MinMaxScaler()), ("classifier", model)])
     param_distribution = spec_to_config_space(specs=hyperparameter_specs)
-    hp_search = HpBandSterSearchCV(
-        estimator=model, param_distributions=param_distribution, cv=cv,
-        **grid_search_params)
-    hp_search = HalvingRandomSearchCV(estimator=model, param_distributions=param_distribution,
-                                      resource=resource, max_resources=)
-
-    # run hyperband
-    grid_result = hp_search.fit(X_train, y_train)
+    search = HalvingRandomSearchCV(estimator=pipe,
+                                   param_distributions=param_distribution.get_hyperparameters_dict(),
+                                   cv=inner_cv, **grid_search_params)
+    search.fit(X=X, y=y)
+    test_score = cross_val_score(estimator=search, X=X, y=y, scoring=grid_search_params["scoring"],
+                                 n_jobs=grid_search_params["n_jobs"], cv=outer_cv)
 
     # log best model
-    ex.info[grid_result.scoring] = float(grid_result.best_score_)
-    ex.info["best_params"] = grid_result.best_params_
+    ex.info["train_" + search.scoring] = float(search.best_score_)
+    ex.info["best_params"] = search.best_params_
+    ex.info["test_" + search.scoring] = [float(x) for x in test_score]
 
     # save all search results
     result_path = Path("search_result.pkl")
     with open(result_path, "wb") as fp:
-        pickle.dump(file=fp, obj=grid_result)
+        pickle.dump(file=fp, obj=search)
     ex.add_artifact(result_path, name="search_result.pkl")
     result_path.unlink()
-
-    # log metrics on test set
-    X_test = scaler.transform(X_test)
-    y_pred = grid_result.best_estimator_.predict(X_test)
-    test_acc = accuracy_score(y_test, y_pred)
-    y_pred_scores = grid_result.best_estimator_.predict_proba(X_test)[:,
-                    1]  # scores need to be probs. for class with greater label, i.e. 1.
-    test_roc_auc = roc_auc_score(y_test, y_pred_scores)
-    ex.info["test_accuracy"] = float(test_acc)
-    ex.info["test_roc_auc"] = test_roc_auc
