@@ -138,13 +138,11 @@ def run(recording_frequency: int, window_in_sec: int, n_inner_splits: int, n_out
                                    param_distributions=param_distribution.get_hyperparameters_dict(),
                                    cv=inner_cv, **grid_search_params)
     search.fit(X=X, y=y)
-    test_score = cross_val_score(estimator=search, X=X, y=y, scoring=grid_search_params["scoring"],
-                                 n_jobs=grid_search_params["n_jobs"], cv=outer_cv)
+
 
     # log best model
     ex.info["train_" + search.scoring] = float(search.best_score_)
     ex.info["best_params"] = search.best_params_
-    ex.info["test_" + search.scoring] = [float(x) for x in test_score]
 
     # save all search results
     result_path = Path("search_result.pkl")
@@ -152,3 +150,7 @@ def run(recording_frequency: int, window_in_sec: int, n_inner_splits: int, n_out
         pickle.dump(file=fp, obj=search)
     ex.add_artifact(result_path, name="search_result.pkl")
     result_path.unlink()
+
+    test_score = cross_val_score(estimator=search, X=X, y=y, scoring=grid_search_params["scoring"],
+                                 n_jobs=grid_search_params["n_jobs"], cv=outer_cv)
+    ex.info["test_" + search.scoring] = [float(x) for x in test_score]
