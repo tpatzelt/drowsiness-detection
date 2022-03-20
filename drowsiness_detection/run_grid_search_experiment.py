@@ -152,5 +152,5 @@ def run(recording_frequency: int, window_in_sec: int, n_inner_splits: int, n_out
     result_path.unlink()
 
     test_score = cross_val_score(estimator=search, X=X, y=y, scoring=grid_search_params["scoring"],
-                                 n_jobs=grid_search_params["n_jobs"], cv=outer_cv)
+                                 n_jobs=1, cv=outer_cv)
     ex.info["test_" + search.scoring] = [float(x) for x in test_score]
