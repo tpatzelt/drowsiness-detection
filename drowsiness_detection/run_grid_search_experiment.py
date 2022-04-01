@@ -40,7 +40,8 @@ def base():
         "scoring": None,
         "n_jobs": -1,
         "error_score": 0,
-        "verbose": 1
+        "verbose": 1,
+        "shuffle": True
     }
     model_name = None
     hyperparameter_specs = None
@@ -96,12 +97,12 @@ def random_forest():
     hyperparameter_specs = [
         dict(name="CategoricalHyperparameter",
              # kwargs=dict(name="classifier__criterion", choices=["gini", "entropy"])),
-        kwargs = dict(name="classifier__criterion", choices=["entropy"])),
-    dict(name="UniformIntegerHyperparameter",
+             kwargs=dict(name="classifier__criterion", choices=["entropy"])),
+        dict(name="UniformIntegerHyperparameter",
              kwargs=dict(name="classifier__max_depth", lower=2, upper=100, log=False)),
         dict(name="CategoricalHyperparameter",
              # kwargs=dict(name="classifier__max_features", choices=["sqrt", "log2"])),
-        kwargs = dict(name="classifier__max_features", choices=["sqrt"])),
+             kwargs=dict(name="classifier__max_features", choices=["sqrt"])),
     ]
 
 
@@ -134,13 +135,14 @@ def run(recording_frequency: int, window_in_sec: int,
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
                                                         random_state=seed)
 
-    cv = StratifiedKFold(n_splits=n_splits)
+    cv = StratifiedKFold(n_splits=n_splits, random_state=seed,
+                         shuffle=grid_search_params.pop("shuffle"))
 
     pipe = Pipeline([("scaler", MinMaxScaler()), ("classifier", model)])
     param_distribution = spec_to_config_space(specs=hyperparameter_specs)
     search = HalvingRandomSearchCV(estimator=pipe,
                                    param_distributions=param_distribution.get_hyperparameters_dict(),
-                                   cv=cv, **grid_search_params)
+                                   cv=cv, **grid_search_params, random_state=seed)
     search.fit(X=X_train, y=y_train)
 
     # log best model
