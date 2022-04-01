@@ -7,6 +7,7 @@ from sklearn.experimental import enable_halving_search_cv  # noqa
 from sklearn.model_selection import HalvingRandomSearchCV
 from sklearn.pipeline import Pipeline
 import pickle
+from sklearn.model_selection import train_test_split
 from drowsiness_detection.helpers import spec_to_config_space
 from sklearn.dummy import DummyClassifier
 from sklearn.preprocessing import MinMaxScaler
@@ -15,8 +16,8 @@ from sacred import Experiment
 from sacred.observers import FileStorageObserver
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import KFold, cross_val_score
 from drowsiness_detection import config
+from sklearn.model_selection import StratifiedKFold
 
 from drowsiness_detection.data import session_type_mapping, get_feature_data, \
     preprocess_feature_data
@@ -28,17 +29,17 @@ ex.observers.append(FileStorageObserver(Path(__file__).parent.parent.joinpath("l
 @ex.config
 def base():
     seed = 123
+    test_size = .2
     recording_frequency = None
     window_in_sec = None
-    n_inner_splits = 3
-    n_outer_splits = 3
+    n_splits = 10
     grid_search_params = {
         "factor": None,
         "max_resources": None,
         "resource": None,
         "scoring": None,
         "n_jobs": -1,
-        "error_score": "raise",
+        "error_score": 0,
         "verbose": 1
     }
     model_name = None
@@ -73,7 +74,8 @@ def logistic_regression():
         "scoring": "accuracy",
     }
     hyperparameter_specs = [dict(name="UniformFloatHyperparameter",
-                                 kwargs=dict(name="classifier__C", lower=.001, upper=100, log=True)),
+                                 kwargs=dict(name="classifier__C", lower=.001, upper=100,
+                                             log=True)),
                             dict(name="CategoricalHyperparameter",
                                  kwargs=dict(name="classifier__solver", choices=["liblinear"])),
                             dict(name="CategoricalHyperparameter",
@@ -93,11 +95,13 @@ def random_forest():
     }
     hyperparameter_specs = [
         dict(name="CategoricalHyperparameter",
-             kwargs=dict(name="classifier__criterion", choices=["gini", "entropy"])),
-        dict(name="UniformIntegerHyperparameter",
+             # kwargs=dict(name="classifier__criterion", choices=["gini", "entropy"])),
+        kwargs = dict(name="classifier__criterion", choices=["entropy"])),
+    dict(name="UniformIntegerHyperparameter",
              kwargs=dict(name="classifier__max_depth", lower=2, upper=100, log=False)),
         dict(name="CategoricalHyperparameter",
-             kwargs=dict(name="classifier__max_features", choices=["sqrt", "log2"])),
+             # kwargs=dict(name="classifier__max_features", choices=["sqrt", "log2"])),
+        kwargs = dict(name="classifier__max_features", choices=["sqrt"])),
     ]
 
 
@@ -114,9 +118,9 @@ def parse_model_name(model_name: str):
 
 
 @ex.automain
-def run(recording_frequency: int, window_in_sec: int, n_inner_splits: int, n_outer_splits: int,
+def run(recording_frequency: int, window_in_sec: int,
         grid_search_params: dict, model_name: str, exclude_by: str, hyperparameter_specs: dict,
-        seed):
+        seed, test_size: float, n_splits: int):
     # set up global paths and cache dir for pipeline
     config.set_paths(frequency=recording_frequency, seconds=window_in_sec)
 
@@ -127,18 +131,17 @@ def run(recording_frequency: int, window_in_sec: int, n_inner_splits: int, n_out
     data = get_feature_data(data_path=config.PATHS.WINDOW_FEATURES)
     X, y = preprocess_feature_data(feature_data=data,
                                    exclude_sess_type=session_type_mapping[exclude_by])
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
+                                                        random_state=seed)
 
-    inner_cv = KFold(n_splits=n_inner_splits, shuffle=True, random_state=seed)
-    outer_cv = KFold(n_splits=n_outer_splits, shuffle=True, random_state=seed)
+    cv = StratifiedKFold(n_splits=n_splits)
 
     pipe = Pipeline([("scaler", MinMaxScaler()), ("classifier", model)])
-    print(pipe.get_params().keys())
     param_distribution = spec_to_config_space(specs=hyperparameter_specs)
     search = HalvingRandomSearchCV(estimator=pipe,
                                    param_distributions=param_distribution.get_hyperparameters_dict(),
-                                   cv=inner_cv, **grid_search_params)
-    search.fit(X=X, y=y)
-
+                                   cv=cv, **grid_search_params)
+    search.fit(X=X_train, y=y_train)
 
     # log best model
     ex.info["train_" + search.scoring] = float(search.best_score_)
@@ -151,6 +154,6 @@ def run(recording_frequency: int, window_in_sec: int, n_inner_splits: int, n_out
     ex.add_artifact(result_path, name="search_result.pkl")
     result_path.unlink()
 
-    test_score = cross_val_score(estimator=search, X=X, y=y, scoring=grid_search_params["scoring"],
-                                 n_jobs=1, cv=outer_cv)
-    ex.info["test_" + search.scoring] = [float(x) for x in test_score]
+    # log metrics on test set
+    test_score = search.score(X_test, y_test)
+    ex.info["test_" + search.scoring] = float(test_score)
