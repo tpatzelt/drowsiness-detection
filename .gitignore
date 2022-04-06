@@ -4,3 +4,4 @@ notebooks/.ipynb_checkpoints/
 logs/
 drowsiness_detection/__pycache__/
 foobar/
+cache/
