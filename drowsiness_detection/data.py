@@ -185,6 +185,55 @@ def preprocess_feature_data(feature_data: np.ndarray, exclude_sess_type: int):
     return X, y
 
 
+def get_data_for_nn(data_path: Path = config.PATHS.WINDOW_DATA):
+    """Loads all files under data_path, adds the session type, subject id and kss score as new columns. """
+    for feature_file in data_path.iterdir():
+        sess_type, subject_id = filename_to_session_type_and_id(feature_file)
+        features = np.load(feature_file)  # (355,301,23)
+        targets = get_kss_labels_for_feature_file(feature_file)  # (355,)
+        if features.shape[0] != targets.shape[0]:
+            raise ValueError(f"{features.shape} vs {targets.shape}")
+
+        sess_types = np.repeat(session_type_mapping[sess_type], len(targets))
+        subject_ids = np.repeat(subject_id, len(targets))
+        yield features, targets, sess_types, subject_ids
+
+
+def preprocess_data_for_nn(data_generator, exclude_sess_type: int):
+    for feature_data, targets, session_types, subject_ids in data_generator:
+        KSS_THRESHOLD = 7
+        feature_data = np.nan_to_num(feature_data)
+        targets = binarize(targets, threshold=KSS_THRESHOLD)
+        # remove one session type
+        session_mask = session_types != session_type_mapping[exclude_sess_type]
+        feature_data = feature_data[session_mask, :, :]
+        targets = targets[session_mask]
+        # print(f"{feature_data.shape} vs {targets.shape}")
+        if feature_data.shape[0] != targets.shape[0]:
+            raise ValueError(f"{feature_data.shape} vs {targets.shape}")
+        if feature_data.size == 0:
+            continue
+        yield feature_data, targets
+
+
+# %%
+def merge_nn_data(data_generator):
+    """ Aggregates the data from data_generator into one array."""
+
+    values_per_block = config.PATHS.seconds * config.PATHS.frequency
+    Xs, ys = [], []
+    for X, y in data_generator:
+        if X.shape[1] < values_per_block:
+            num_missing_rows = values_per_block - X.shape[1]
+            missing_rows_X = np.stack([X[:, -1, :]] * num_missing_rows, axis=1)
+            X = np.concatenate([X, missing_rows_X], axis=1)
+        elif X.shape[1] > values_per_block:
+            X = X[:, :values_per_block, :]
+        Xs.append(X)
+        ys.append(y)
+    return np.concatenate(Xs), np.concatenate(ys)
+
+
 if __name__ == '__main__':
     import random
 
