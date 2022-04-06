@@ -87,8 +87,9 @@ def show_frame_slider(data: np.array, n_frames: int = 60):
     return sframes, ax
 
 
-def plot_roc_over_n_folds(classifier, X, y, n_splits=6, fit_model=False, ax=None):
-    cv = StratifiedKFold(n_splits=n_splits)
+def plot_roc_over_n_folds(classifier, X, y, cv=6, fit_model=False, ax=None):
+    if isinstance(cv, int):
+        cv = StratifiedKFold(n_splits=cv)
 
     tprs = []
     aucs = []
