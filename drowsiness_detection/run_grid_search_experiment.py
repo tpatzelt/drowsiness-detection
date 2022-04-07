@@ -146,7 +146,7 @@ def run(recording_frequency: int, window_in_sec: int,
     search.fit(X=X_train, y=y_train)
 
     # log best model
-    ex.info["cv_train_" + search.scoring] = float(search.best_score_)
+    ex.info["cv_test_" + search.scoring] = float(search.best_score_)
     ex.info["best_params"] = search.best_params_
 
     # save all search results
@@ -162,9 +162,9 @@ def run(recording_frequency: int, window_in_sec: int,
 
     # log metrics on test set
     train_score = new_pipe.score(X_train, y_train)
-    ex.info["train_accuracy"] = float(train_score)
+    ex.info["train_" + search.scoring] = float(train_score)
     test_score = new_pipe.score(X_test, y_test)
-    ex.info["test_accuracy"] = float(test_score)
+    ex.info["test_" + search.scoring] = float(test_score)
 
     # save all search results
     result_path = Path("best_model.pkl")
