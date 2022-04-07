@@ -41,7 +41,7 @@ def base():
         "n_jobs": -1,
         "error_score": 0,
         "verbose": 1,
-        "shuffle": True
+        "refit": False
     }
     model_name = None
     hyperparameter_specs = None
@@ -136,7 +136,7 @@ def run(recording_frequency: int, window_in_sec: int,
                                                         random_state=seed)
 
     cv = StratifiedKFold(n_splits=n_splits, random_state=seed,
-                         shuffle=grid_search_params.pop("shuffle"))
+                         shuffle=True)
 
     pipe = Pipeline([("scaler", MinMaxScaler()), ("classifier", model)])
     param_distribution = spec_to_config_space(specs=hyperparameter_specs)
@@ -146,7 +146,7 @@ def run(recording_frequency: int, window_in_sec: int,
     search.fit(X=X_train, y=y_train)
 
     # log best model
-    ex.info["train_" + search.scoring] = float(search.best_score_)
+    ex.info["cv_train_" + search.scoring] = float(search.best_score_)
     ex.info["best_params"] = search.best_params_
 
     # save all search results
@@ -156,6 +156,19 @@ def run(recording_frequency: int, window_in_sec: int,
     ex.add_artifact(result_path, name="search_result.pkl")
     result_path.unlink()
 
+    # train model on entire dataset
+    new_pipe = pipe.set_params(**search.best_params_)
+    new_pipe.fit(X=X_train, y=y_train)
+
     # log metrics on test set
-    test_score = search.score(X_test, y_test)
-    ex.info["test_" + search.scoring] = float(test_score)
+    train_score = new_pipe.score(X_train, y_train)
+    ex.info["train_accuracy"] = float(train_score)
+    test_score = new_pipe.score(X_test, y_test)
+    ex.info["test_accuracy"] = float(test_score)
+
+    # save all search results
+    result_path = Path("best_model.pkl")
+    with open(result_path, "wb") as fp:
+        pickle.dump(file=fp, obj=new_pipe)
+    ex.add_artifact(result_path, name="best_model.pkl")
+    result_path.unlink()
