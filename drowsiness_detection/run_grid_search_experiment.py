@@ -1,16 +1,20 @@
 from sklearnex import patch_sklearn
 
 patch_sklearn()
+from sacred import SETTINGS
 # explicitly require this experimental feature
 from sklearn.experimental import enable_halving_search_cv  # noqa
 # now you can import normally from model_selection
-from sklearn.model_selection import HalvingRandomSearchCV
+from sklearn.model_selection import HalvingRandomSearchCV, RandomizedSearchCV
 from sklearn.pipeline import Pipeline
+from keras.wrappers.scikit_learn import KerasClassifier
+import numpy as np
+
 import pickle
 from sklearn.model_selection import train_test_split
 from drowsiness_detection.helpers import spec_to_config_space
 from sklearn.dummy import DummyClassifier
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from pathlib import Path
 from sacred import Experiment
 from sacred.observers import FileStorageObserver
@@ -18,9 +22,13 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from drowsiness_detection import config
 from sklearn.model_selection import StratifiedKFold
+from drowsiness_detection.models import build_dummy_tf_classifier, ThreeDStandardScaler
 
-from drowsiness_detection.data import session_type_mapping, get_feature_data, \
-    preprocess_feature_data
+import os
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+SETTINGS['CAPTURE_MODE'] = 'sys'
 
 ex = Experiment("grid_search_kss")
 ex.observers.append(FileStorageObserver(Path(__file__).parent.parent.joinpath("logs")))
@@ -30,13 +38,12 @@ ex.observers.append(FileStorageObserver(Path(__file__).parent.parent.joinpath("l
 def base():
     seed = 123
     test_size = .2
+    model_selection_name = "halving-random"
+    scaler_name = "min-max"
     recording_frequency = None
     window_in_sec = None
     n_splits = 10
     grid_search_params = {
-        "factor": None,
-        "max_resources": None,
-        "resource": None,
         "scoring": None,
         "n_jobs": -1,
         "error_score": 0,
@@ -64,6 +71,31 @@ def dummy_classification():
                                   "stratified", "uniform"])),
     ]
     model_name = "DummyClassifier"
+
+
+@ex.named_config
+def dummy_tf_classification():
+    model_selection_name = "random"
+    scaler_name = "3D-standard"
+    grid_search_params = {
+        "scoring": "accuracy",
+        "n_iter": 2
+    }
+    hyperparameter_specs = [
+        dict(name="CategoricalHyperparameter",
+             kwargs=dict(name="classifier__activation",
+                         choices=["softmax", "relu"])),
+        dict(name="CategoricalHyperparameter",
+             kwargs=dict(name="classifier__batch_size",
+                         choices=[10, 20])),
+        dict(name="CategoricalHyperparameter",
+             kwargs=dict(name="classifier__optimizer",
+                         choices=["adam"])),
+        dict(name="CategoricalHyperparameter",
+             kwargs=dict(name="classifier__input_shape",
+                         choices=["1,300,23"]))
+    ]
+    model_name = "DummyTFClassifier"
 
 
 @ex.named_config
@@ -113,13 +145,37 @@ def parse_model_name(model_name: str):
         model = LogisticRegression()
     elif model_name == "DummyClassifier":
         model = DummyClassifier()
+    elif model_name == "DummyTFClassifier":
+        model = KerasClassifier(build_fn=build_dummy_tf_classifier)
     else:
         raise ValueError
     return model
 
 
+def parse_model_selection_name(model_selection_name: str):
+    if model_selection_name == "random":
+        model_selection = RandomizedSearchCV
+    elif model_selection_name == "halving-random":
+        model_selection = HalvingRandomSearchCV
+    else:
+        raise ValueError
+    return model_selection
+
+
+def parse_scaler_name(scaler_name: str):
+    if scaler_name == "min-max":
+        scaler = MinMaxScaler()
+    elif scaler_name == "standard":
+        scaler = StandardScaler()
+    elif scaler_name == "3D-standard":
+        scaler = ThreeDStandardScaler()
+    else:
+        raise ValueError
+    return scaler
+
+
 @ex.automain
-def run(recording_frequency: int, window_in_sec: int,
+def run(recording_frequency: int, window_in_sec: int, model_selection_name: str, scaler_name: str,
         grid_search_params: dict, model_name: str, exclude_by: str, hyperparameter_specs: dict,
         seed, test_size: float, n_splits: int):
     # set up global paths and cache dir for pipeline
@@ -127,22 +183,27 @@ def run(recording_frequency: int, window_in_sec: int,
 
     # load model
     model = parse_model_name(model_name=model_name)
-
+    scaler = parse_scaler_name(scaler_name=scaler_name)
     # load data
-    data = get_feature_data(data_path=config.PATHS.WINDOW_FEATURES)
-    X, y = preprocess_feature_data(feature_data=data,
-                                   exclude_sess_type=session_type_mapping[exclude_by])
+    # data = get_feature_data(data_path=config.PATHS.WINDOW_FEATURES)
+    # X, y = preprocess_feature_data(feature_data=data,
+    #                                exclude_sess_type=session_type_mapping[exclude_by])
+    num_samples = 200
+    X = np.random.random(num_samples * 300 * 23).reshape((num_samples, 300, 23))
+    y = np.concatenate((np.zeros((num_samples // 2)), np.ones((num_samples // 2))))
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
                                                         random_state=seed)
 
     cv = StratifiedKFold(n_splits=n_splits, random_state=seed,
                          shuffle=True)
 
-    pipe = Pipeline([("scaler", MinMaxScaler()), ("classifier", model)])
+    pipe = Pipeline([("scaler", scaler), ("classifier", model)])
     param_distribution = spec_to_config_space(specs=hyperparameter_specs)
-    search = HalvingRandomSearchCV(estimator=pipe,
-                                   param_distributions=param_distribution.get_hyperparameters_dict(),
-                                   cv=cv, **grid_search_params, random_state=seed)
+
+    model_selection = parse_model_selection_name(model_selection_name=model_selection_name)
+    search = model_selection(estimator=pipe,
+                             param_distributions=param_distribution.get_hyperparameters_dict(),
+                             cv=cv, **grid_search_params, random_state=seed)
     search.fit(X=X_train, y=y_train)
 
     # log best model
@@ -167,8 +228,13 @@ def run(recording_frequency: int, window_in_sec: int,
     ex.info["test_" + search.scoring] = float(test_score)
 
     # save all search results
-    result_path = Path("best_model.pkl")
-    with open(result_path, "wb") as fp:
-        pickle.dump(file=fp, obj=new_pipe)
-    ex.add_artifact(result_path, name="best_model.pkl")
-    result_path.unlink()
+    if isinstance(new_pipe.named_steps["classifier"], KerasClassifier):
+        result_path = Path(ex.observers[0].dir).joinpath("best_model")
+        result_path.mkdir()
+        new_pipe.named_steps["classifier"].model.save(result_path)
+    else:
+        result_path = Path("best_model.pkl")
+        with open(result_path, "wb") as fp:
+            pickle.dump(file=fp, obj=new_pipe)
+        ex.add_artifact(result_path, name="best_model.pkl")
+        result_path.unlink()
