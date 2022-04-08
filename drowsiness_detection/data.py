@@ -199,7 +199,7 @@ def get_data_for_nn(data_path: Path = config.PATHS.WINDOW_DATA):
         yield features, targets, sess_types, subject_ids
 
 
-def preprocess_data_for_nn(data_generator, exclude_sess_type: int):
+def preprocess_data_for_nn(data_generator, exclude_sess_type: str):
     for feature_data, targets, session_types, subject_ids in data_generator:
         KSS_THRESHOLD = 7
         feature_data = np.nan_to_num(feature_data)
@@ -232,6 +232,14 @@ def merge_nn_data(data_generator):
         Xs.append(X)
         ys.append(y)
     return np.concatenate(Xs), np.concatenate(ys)
+
+
+def load_nn_data(exclude_by: str = "a", data_path: Path = config.PATHS.WINDOW_DATA):
+    data_gen = get_data_for_nn(data_path=data_path)
+    data_gen = preprocess_data_for_nn(data_generator=data_gen, exclude_sess_type=exclude_by)
+    for _ in range(50):
+        next(data_gen)
+    return merge_nn_data(data_generator=data_gen)
 
 
 if __name__ == '__main__':
