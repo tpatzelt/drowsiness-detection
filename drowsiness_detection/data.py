@@ -129,7 +129,7 @@ def feature_array_to_df(arr: np.ndarray) -> pd.DataFrame:
 def get_session_idx(ids: np.array):
     session_idx = []
     for s_type, s_int in session_type_mapping.items():
-        idx = np.squeeze(np.argwhere(ids[:, 0] == s_int))
+        idx = np.squeeze(np.argwhere(ids == s_int))
         session_idx.append((idx, s_type))
     return session_idx
 
@@ -171,7 +171,8 @@ def get_feature_data(data_path: Path = config.PATHS.WINDOW_FEATURES):
     return np.concatenate(all_arrays)
 
 
-def preprocess_feature_data(feature_data: np.ndarray, exclude_sess_type: int):
+def preprocess_feature_data(feature_data: np.ndarray, exclude_sess_type: int,
+                            include_sess_and_subject_id: False):
     """Preprocessing the feature data includes removing NaNs,
     binarize kss scores and split into features and targets."""
     # col -3 is targets, -2 is sess type and -1 is subject id
@@ -181,7 +182,10 @@ def preprocess_feature_data(feature_data: np.ndarray, exclude_sess_type: int):
     # remove one session type
     feature_data = feature_data[feature_data[:, -2] != exclude_sess_type]
     X = feature_data[:, :-3]
-    y = feature_data[:, -3]
+    if include_sess_and_subject_id:
+        y = feature_data[:, -3:]
+    else:
+        y = feature_data[:, -3]
     return X, y
 
 
