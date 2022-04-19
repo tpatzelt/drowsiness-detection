@@ -171,13 +171,21 @@ def get_feature_data(data_path: Path = config.PATHS.WINDOW_FEATURES):
     return np.concatenate(all_arrays)
 
 
-def preprocess_feature_data(feature_data: np.ndarray, exclude_sess_type: int):
+def preprocess_feature_data(feature_data: np.ndarray, exclude_sess_type: int, num_targets: int):
     """Preprocessing the feature data includes removing NaNs,
     binarize kss scores and split into features and targets."""
     # col -3 is targets, -2 is sess type and -1 is subject id
-    KSS_THRESHOLD = 7
     feature_data = np.nan_to_num(feature_data)
-    feature_data[:, -3] = binarize(feature_data[:, -3], threshold=KSS_THRESHOLD)
+    targets = feature_data[:, -3]
+    if num_targets == 2:
+        KSS_THRESHOLD = 7
+        targets = binarize(targets, threshold=KSS_THRESHOLD)
+    elif num_targets == 3:
+        ALERT = 6
+        NEUTRAL = 8
+        SLEEPY = 10
+        targets = np.digitize(targets, bins=[ALERT, NEUTRAL, SLEEPY])
+    feature_data[:, -3] = targets
     # remove one session type
     feature_data = feature_data[feature_data[:, -2] != exclude_sess_type]
     X = feature_data[:, :-3]
@@ -199,11 +207,9 @@ def get_data_for_nn(data_path: Path = config.PATHS.WINDOW_DATA):
         yield features, targets, sess_types, subject_ids
 
 
-def preprocess_data_for_nn(data_generator, exclude_sess_type: str):
+def preprocess_data_for_nn(data_generator, exclude_sess_type: str, num_targets: int):
     for feature_data, targets, session_types, subject_ids in data_generator:
-        KSS_THRESHOLD = 7
         feature_data = np.nan_to_num(feature_data)
-        targets = binarize(targets, threshold=KSS_THRESHOLD)
         # remove one session type
         session_mask = session_types != session_type_mapping[exclude_sess_type]
         feature_data = feature_data[session_mask, :, :]

@@ -8,10 +8,10 @@ from sklearn.experimental import enable_halving_search_cv  # noqa
 from sklearn.model_selection import HalvingRandomSearchCV, RandomizedSearchCV
 from sklearn.pipeline import Pipeline
 from keras.wrappers.scikit_learn import KerasClassifier
-import numpy as np
 
 import pickle
-from sklearn.model_selection import train_test_split
+from drowsiness_detection.data import get_feature_data, preprocess_feature_data, \
+    session_type_mapping
 from drowsiness_detection.helpers import spec_to_config_space
 from sklearn.dummy import DummyClassifier
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
@@ -54,6 +54,7 @@ def base():
     hyperparameter_specs = None
 
     exclude_by = "a"
+    num_targets = 3
 
 
 @ex.named_config
@@ -177,7 +178,7 @@ def parse_scaler_name(scaler_name: str):
 @ex.automain
 def run(recording_frequency: int, window_in_sec: int, model_selection_name: str, scaler_name: str,
         grid_search_params: dict, model_name: str, exclude_by: str, hyperparameter_specs: dict,
-        seed, test_size: float, n_splits: int):
+        seed, test_size: float, n_splits: int, num_targets: int):
     # set up global paths and cache dir for pipeline
     config.set_paths(frequency=recording_frequency, seconds=window_in_sec)
 
@@ -185,14 +186,15 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     model = parse_model_name(model_name=model_name)
     scaler = parse_scaler_name(scaler_name=scaler_name)
     # load data
-    # data = get_feature_data(data_path=config.PATHS.WINDOW_FEATURES)
-    # X, y = preprocess_feature_data(feature_data=data,
-    #                                exclude_sess_type=session_type_mapping[exclude_by])
-    num_samples = 200
-    X = np.random.random(num_samples * 300 * 23).reshape((num_samples, 300, 23))
-    y = np.concatenate((np.zeros((num_samples // 2)), np.ones((num_samples // 2))))
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
-                                                        random_state=seed)
+    data = get_feature_data(data_path=config.PATHS.WINDOW_FEATURES)
+    X, y = preprocess_feature_data(feature_data=data,
+                                   exclude_sess_type=session_type_mapping[exclude_by],
+                                   num_targets=num_targets)
+    # num_samples = 200
+    # X = np.random.random(num_samples * 300 * 23).reshape((num_samples, 300, 23))
+    # y = np.concatenate((np.zeros((num_samples // 2)), np.ones((num_samples // 2))))
+    # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
+    #                                                     random_state=seed)
 
     cv = StratifiedKFold(n_splits=n_splits, random_state=seed,
                          shuffle=True)
