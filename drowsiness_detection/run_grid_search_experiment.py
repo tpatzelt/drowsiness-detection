@@ -39,7 +39,7 @@ def base():
     seed = 123
     test_size = .2
     model_selection_name = "halving-random"
-    scaler_name = "min-max"
+    scaler_name = ""
     recording_frequency = None
     window_in_sec = None
     n_splits = 10
@@ -71,10 +71,14 @@ def dummy_classification():
     hyperparameter_specs = [
         dict(name="CategoricalHyperparameter",
              kwargs=dict(name="classifier__strategy",
-                         choices=["most_frequent", "prior",
-                                  "stratified", "uniform"])),
+                         choices=["most_frequent",
+                                  "prior",
+                                  "stratified",
+                                  "uniform"
+                                  ])),
     ]
     model_name = "DummyClassifier"
+    scaler_name = "3D-standard"
 
 
 @ex.named_config
