@@ -185,6 +185,18 @@ def preprocess_feature_data(feature_data: np.ndarray, exclude_sess_type: int, nu
         NEUTRAL = 8
         SLEEPY = 10
         targets = np.digitize(targets, bins=[ALERT, NEUTRAL, SLEEPY])
+    elif num_targets == 5:
+        first = 3
+        second = 5
+        third = 7
+        forth = 9
+        fifth = 10
+        targets = np.digitize(targets, bins=[first,second, third, forth, fifth])
+    elif num_targets == 9:
+        targets = np.digitize(targets, bins=range(1,10))
+    else:
+        raise ValueError(f"num targets {num_targets} not supported.")
+
     feature_data[:, -3] = targets
     # remove one session type
     feature_data = feature_data[feature_data[:, -2] != exclude_sess_type]
