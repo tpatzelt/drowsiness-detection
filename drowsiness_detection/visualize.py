@@ -274,7 +274,7 @@ def plot_search_results(grid):
     Plots the grid values of each parameter at
     a time against the fixed set of best values
     of the other parameters.
-    Note: The type of parameters should be uniform
+    Note: The type of parameters should be homogeneous
     for plotting/labeling the x-axis. For example,
     'max_depth = [1,2,None]' does not work.
 

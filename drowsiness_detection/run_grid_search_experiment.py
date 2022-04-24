@@ -48,7 +48,9 @@ def base():
         "n_jobs": -1,
         "error_score": 0,
         "verbose": 1,
-        "refit": False
+        "refit": False,
+        # "return_train_scores": True
+
     }
     model_name = None
     hyperparameter_specs = None
@@ -127,6 +129,8 @@ def random_forest():
         "max_resources": 3000,
         "resource": 'classifier__n_estimators',
         "scoring": "accuracy",
+        "return_train_scores": True
+
     }
     hyperparameter_specs = [
         dict(name="CategoricalHyperparameter",
