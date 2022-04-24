@@ -35,7 +35,7 @@ recording_frequency = 30
 window_in_sec = 60
 
 exclude_by = "a"
-n_jobs = -2
+n_jobs = 3
 rf_params = {
     "criterion": "entropy",
     "max_depth": 32,
@@ -59,7 +59,7 @@ def run(num_targets):
     # set up global paths and cache dir for pipeline
 
     # load model
-    model = RandomForestClassifier(**rf_params)
+    model = RandomForestClassifier(**rf_params, n_jobs=2)
     model = MultiOutputClassifier(model, n_jobs=n_jobs)
     scaler = ThreeDStandardScaler()
     # load data
@@ -75,8 +75,6 @@ def run(num_targets):
 
     y_train = to_categorical(y=y_train - 1, num_classes=num_targets)
     y_test = to_categorical(y=y_test - 1, num_classes=num_targets)
-    print(X_train.shape)
-    print(y_train.shape)
 
     model.fit(X=X_train, Y=y_train)
 
