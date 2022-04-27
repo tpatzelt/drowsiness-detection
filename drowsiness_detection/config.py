@@ -2,8 +2,8 @@ from pathlib import Path
 
 SOURCES_ROOT_PATH = Path(__file__).parent
 
-# BASE_PATH = Path("/home/tim/Windows")
-BASE_PATH = Path("/media/tim/My Passport/drowsiness_data/Windows")
+BASE_PATH = Path("/home/tim/Windows")
+# BASE_PATH = Path("/media/tim/My Passport/drowsiness_data/Windows")
 PATHS = None
 
 
