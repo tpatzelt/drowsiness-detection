@@ -130,7 +130,7 @@ def random_forest():
     model_name = "RandomForestClassifier"
     grid_search_params = {
         "factor": 3,
-        "max_resources": 3000,
+        "max_resources": 1000,
         "resource": 'classifier__n_estimators',
         "scoring": "accuracy",
         "return_train_scores": True
@@ -141,7 +141,7 @@ def random_forest():
              # kwargs=dict(name="classifier__criterion", choices=["gini", "entropy"])),
              kwargs=dict(name="classifier__criterion", choices=["entropy"])),
         dict(name="UniformIntegerHyperparameter",
-             kwargs=dict(name="classifier__max_depth", lower=2, upper=100, log=False)),
+             kwargs=dict(name="classifier__max_depth", lower=2, upper=150, log=False)),
         dict(name="CategoricalHyperparameter",
              # kwargs=dict(name="classifier__max_features", choices=["sqrt", "log2"])),
              kwargs=dict(name="classifier__max_features", choices=["sqrt"])),
