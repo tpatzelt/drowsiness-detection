@@ -5,7 +5,8 @@ from sacred import SETTINGS
 # explicitly require this experimental feature
 from sklearn.experimental import enable_halving_search_cv  # noqa
 # now you can import normally from model_selection
-from sklearn.model_selection import HalvingRandomSearchCV, RandomizedSearchCV, train_test_split
+from sklearn.model_selection import HalvingRandomSearchCV, RandomizedSearchCV, train_test_split, \
+    GridSearchCV
 import numpy as np
 from sklearn.pipeline import Pipeline
 from keras.wrappers.scikit_learn import KerasClassifier
@@ -49,14 +50,14 @@ def base():
         "error_score": 0,
         "verbose": 1,
         "refit": False,
-        # "return_train_scores": True
+        # "return_train_score": True
 
     }
     model_name = None
     hyperparameter_specs = None
 
     exclude_by = "a"
-    num_targets = 3
+    num_targets = 2
     use_dummy_data = False
 
 
@@ -127,25 +128,32 @@ def logistic_regression():
 
 @ex.named_config
 def random_forest():
+    model_selection_name = "random"
     model_name = "RandomForestClassifier"
     grid_search_params = {
-        "factor": 3,
-        "max_resources": 1000,
-        "resource": 'classifier__n_estimators',
+        # "factor": 3,
+        # "max_resources": 1000,
+        # "resource": 'classifier__n_estimators',
         "scoring": "accuracy",
-        "return_train_scores": True
+        "return_train_score": True,
+        "n_iter": 1
 
     }
     hyperparameter_specs = [
         dict(name="CategoricalHyperparameter",
              # kwargs=dict(name="classifier__criterion", choices=["gini", "entropy"])),
              kwargs=dict(name="classifier__criterion", choices=["entropy"])),
-        dict(name="UniformIntegerHyperparameter",
-             kwargs=dict(name="classifier__max_depth", lower=2, upper=150, log=False)),
+        # dict(name="UniformIntegerHyperparameter",
+        #      kwargs=dict(name="classifier__max_depth", lower=2, upper=150, log=False)),
+        dict(name="CategoricalHyperparameter",
+             kwargs=dict(name="classifier__max_depth", choices=[35])),
         dict(name="CategoricalHyperparameter",
              # kwargs=dict(name="classifier__max_features", choices=["sqrt", "log2"])),
              kwargs=dict(name="classifier__max_features", choices=["sqrt"])),
+        dict(name="CategoricalHyperparameter",
+             kwargs=dict(name="classifier__n_estimators", choices=[512]))
     ]
+    scaler_name = "standard"
 
 
 def parse_model_name(model_name: str):
@@ -167,6 +175,8 @@ def parse_model_selection_name(model_selection_name: str):
         model_selection = RandomizedSearchCV
     elif model_selection_name == "halving-random":
         model_selection = HalvingRandomSearchCV
+    elif model_selection_name == "grid":
+        model_selection = GridSearchCV
     else:
         raise ValueError
     return model_selection
@@ -191,6 +201,8 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     # set up global paths and cache dir for pipeline
     config.set_paths(frequency=recording_frequency, seconds=window_in_sec)
 
+    print(f"Starting experiment on {recording_frequency} sec data with {num_targets} targets.")
+
     # load model
     model = parse_model_name(model_name=model_name)
     scaler = parse_scaler_name(scaler_name=scaler_name)
@@ -214,9 +226,15 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     param_distribution = spec_to_config_space(specs=hyperparameter_specs)
 
     model_selection = parse_model_selection_name(model_selection_name=model_selection_name)
-    search = model_selection(estimator=pipe,
-                             param_distributions=param_distribution.get_hyperparameters_dict(),
-                             cv=cv, **grid_search_params, random_state=seed)
+    if model_selection is GridSearchCV:
+        raise NotImplementedError("Grid search does not work with hyperparameter dict.")
+        # search = model_selection(estimator=pipe,
+        #                          param_grid=param_distribution.get_hyperparameters_dict(),
+        #                          cv=cv, **grid_search_params)
+    else:
+        search = model_selection(estimator=pipe,
+                                 param_distributions=param_distribution.get_hyperparameters_dict(),
+                                 cv=cv, **grid_search_params, random_state=seed)
     search.fit(X=X_train, y=y_train)
 
     # log best model
