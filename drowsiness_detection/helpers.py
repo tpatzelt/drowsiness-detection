@@ -38,7 +38,7 @@ def label_to_one_hot_like(arr, k=9):
 
 
 def binarize(arr: np.ndarray, threshold: float) -> np.ndarray:
-    return (arr < threshold).astype(int)
+    return (arr >= threshold).astype(int)
 
 
 class ArrayWrapper:
