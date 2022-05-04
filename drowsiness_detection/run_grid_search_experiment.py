@@ -201,7 +201,7 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     # set up global paths and cache dir for pipeline
     config.set_paths(frequency=recording_frequency, seconds=window_in_sec)
 
-    print(f"Starting experiment on {recording_frequency} sec data with {num_targets} targets.")
+    print(f"Starting experiment on {window_in_sec} sec data with {num_targets} targets.")
 
     # load model
     model = parse_model_name(model_name=model_name)
