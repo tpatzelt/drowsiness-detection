@@ -11,8 +11,8 @@ import numpy as np
 from sklearn.pipeline import Pipeline
 from keras.wrappers.scikit_learn import KerasClassifier
 import pickle
-from drowsiness_detection.data import get_feature_data, preprocess_feature_data, \
-    session_type_mapping
+from drowsiness_detection.data import (get_feature_data, preprocess_feature_data,
+                                       session_type_mapping)
 from drowsiness_detection.helpers import spec_to_config_space
 from sklearn.dummy import DummyClassifier
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
@@ -151,7 +151,9 @@ def random_forest():
              # kwargs=dict(name="classifier__max_features", choices=["sqrt", "log2"])),
              kwargs=dict(name="classifier__max_features", choices=["sqrt"])),
         dict(name="CategoricalHyperparameter",
-             kwargs=dict(name="classifier__n_estimators", choices=[512]))
+             kwargs=dict(name="classifier__n_estimators", choices=[512])),
+        dict(name="CategoricalHyperparameter",
+             kwargs=dict(name="classifier__class_weight", choices=["balanced"]))
     ]
     scaler_name = "standard"
 
