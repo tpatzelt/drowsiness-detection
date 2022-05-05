@@ -1,12 +1,18 @@
+from copy import deepcopy
+
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import animation
 from matplotlib.widgets import Slider
 from sklearn.metrics import RocCurveDisplay
+from sklearn.metrics import accuracy_score
 from sklearn.metrics import auc
 from sklearn.model_selection import StratifiedKFold
 
+from drowsiness_detection import config
 from drowsiness_detection.data import get_session_idx, get_subject_idx
+from drowsiness_detection.data import (load_experiment_objects, load_preprocessed_train_test_splits,
+                                       session_type_mapping)
 
 
 def plot_acc_and_loss(history):
@@ -311,3 +317,91 @@ def plot_search_results(grid):
         ax[i].set_xlabel(p.upper())
 
     plt.show()
+
+
+def plot_roc_curve_from_log_dir(experiment_id=21, plot_train_roc: bool = False, ax=None,
+                                pos_label=1):
+    if ax is None:
+        fig, ax = plt.subplots()
+
+    exp_config, best_estimator, _ = load_experiment_objects(experiment_id=experiment_id)
+
+    window_size = exp_config["window_in_sec"]
+    config.set_paths(30, window_size)
+
+    # load data
+    X_train, X_test, y_train, y_test = load_preprocessed_train_test_splits(
+        data_path=config.PATHS.WINDOW_FEATURES,
+        exclude_sess_type=session_type_mapping[exp_config["exclude_by"]],
+        num_targets=exp_config["num_targets"],
+        seed=exp_config["seed"],
+        test_size=exp_config["test_size"])
+
+    RocCurveDisplay.from_estimator(estimator=best_estimator, X=X_test, y=y_test,
+                                   name=f"RF-{window_size}s" + ("(test)" if plot_train_roc else ""),
+                                   ax=ax, pos_label=pos_label)
+    if plot_train_roc:
+        RocCurveDisplay.from_estimator(estimator=best_estimator, X=X_train, y=y_train,
+                                       name=f"RF-{window_size}s(train)", ax=ax, pos_label=pos_label)
+
+
+def plot_learning_curve_from_errors(train_errors, test_errors, n_estimator_options,
+                                    window_size: int, ax=None):
+    if ax is None:
+        fig, ax = plt.subplots()
+    ax.set_title(f"Learning Curve of Random Forest Classifier (window size {window_size} sec.)")
+    ax.plot(n_estimator_options, train_errors, '-r', label="train")
+    ax.plot(n_estimator_options, test_errors, '-g', label="test")
+    ax.set_xlabel("Number of Estimators")
+    ax.set_ylabel("Accuracy")
+    _ = ax.legend()
+
+
+def plot_learning_curve_from_log_dir(experiment_id, n_estimator_options, ax=None):
+    exp_config, best_estimator, search_result = load_experiment_objects(experiment_id=experiment_id)
+
+    window_size = exp_config["window_in_sec"]
+    config.set_paths(30, window_size)
+
+    X_train, X_test, y_train, y_test = load_preprocessed_train_test_splits(
+        data_path=config.PATHS.WINDOW_FEATURES,
+        exclude_sess_type=session_type_mapping[exp_config["exclude_by"]],
+        num_targets=exp_config["num_targets"],
+        seed=exp_config["seed"],
+        test_size=exp_config["test_size"])
+
+    # flip labels because model was trained that way
+    y_train = ~y_train
+    y_test = ~y_test
+
+    num_samples = -1  # for debugging
+    scaler = search_result.estimator.named_steps['scaler']
+    X_train_scaled = scaler.fit_transform(X_train, y_train)[:num_samples]
+    X_test_scaled = scaler.transform(X_test)[:num_samples]
+
+    warm_start_params = search_result.best_params_.copy()
+    warm_start_params['classifier__n_estimators'] = 1
+    warm_start_params["classifier__warm_start"] = True
+    warm_start_params['classifier__n_jobs'] = -2
+
+    best_estimator = search_result.estimator.set_params(**warm_start_params)
+
+    test_errors = []
+    train_errors = []
+
+    classifier = deepcopy(best_estimator.named_steps['classifier'])
+
+    for added_estimators in n_estimator_options:
+        # print(f" number of estimators: old -> {classifier.n_estimators}, new: {int(added_estimators)}")
+        classifier.n_estimators = int(added_estimators)
+
+        classifier.fit(X_train_scaled, y_train[:num_samples])
+        y_hat_train = classifier.predict(X_train_scaled)
+        y_hat_test = classifier.predict(X_test_scaled)
+
+        train_errors.append(accuracy_score(y_train[:num_samples], y_hat_train))
+        test_errors.append(accuracy_score(y_test[:num_samples], y_hat_test))
+
+    plot_learning_curve_from_errors(train_errors=train_errors, test_errors=test_errors,
+                                    n_estimator_options=n_estimator_options,
+                                    window_size=window_size, ax=ax)

@@ -1,8 +1,11 @@
+import json
+import pickle
 from pathlib import Path
 from random import choice
 
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import train_test_split
 
 from drowsiness_detection import config
 from drowsiness_detection.helpers import binarize, ArrayWrapper, name_generator
@@ -258,6 +261,38 @@ def load_nn_data(exclude_by: str = "a", data_path: Path = config.PATHS.WINDOW_DA
     for _ in range(50):
         next(data_gen)
     return merge_nn_data(data_generator=data_gen)
+
+
+def load_experiment_config(experiment_id: int):
+    with open(f"../../logs/{experiment_id}/config.json") as fp:
+        return json.load(fp)
+
+
+def load_experiment_best_model(experiment_id: int):
+    with open(f"../../logs/{experiment_id}/best_model.pkl", "rb") as fp:
+        return pickle.load(fp)
+
+
+def load_experiment_search_results(experiment_id: int):
+    with open(f"../../logs/{experiment_id}/search_result.pkl", "rb") as fp:
+        return pickle.load(fp)
+
+
+def load_experiment_objects(experiment_id: int):
+    config = load_experiment_config(experiment_id)
+    best_model = load_experiment_best_model(experiment_id)
+    search_results = load_experiment_search_results(experiment_id)
+    return config, best_model, search_results
+
+
+def load_preprocessed_train_test_splits(data_path, exclude_sess_type, num_targets, seed, test_size):
+    data = get_feature_data(data_path=data_path)
+    X, y = preprocess_feature_data(feature_data=data,
+                                   exclude_sess_type=exclude_sess_type,
+                                   num_targets=num_targets)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
+                                                        random_state=seed)
+    return X_train, X_test, y_train, y_test
 
 
 if __name__ == '__main__':
