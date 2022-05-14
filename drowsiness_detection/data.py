@@ -12,6 +12,12 @@ from drowsiness_detection.helpers import binarize, ArrayWrapper, name_generator
 
 session_type_mapping = dict(a=1, b=2, e=3, s=4)
 
+label_names_dict = {  # num_targets: label_names
+    2: ["not drowsy", "drowsy"],
+    3: ["active", "neutral", "drowsy"],
+    5: ["alert", "awake", "neutral", "slightly drowsy", "drowsy"],
+    9: [str(num) for num in range(1, 10)]
+}
 
 def filename_to_session_type_and_id(filename: Path):
     a = filename.name
