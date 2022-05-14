@@ -370,10 +370,7 @@ def plot_learning_curve_from_log_dir(experiment_id, n_estimator_options, ax=None
         seed=exp_config["seed"],
         test_size=exp_config["test_size"])
 
-    # flip labels because model was trained that way
-    y_train = ~y_train
-    y_test = ~y_test
-
+    from sklearn.utils.class_weight import compute_class_weight
     num_samples = -1  # for debugging
     scaler = search_result.estimator.named_steps['scaler']
     X_train_scaled = scaler.fit_transform(X_train, y_train)[:num_samples]
@@ -383,7 +380,11 @@ def plot_learning_curve_from_log_dir(experiment_id, n_estimator_options, ax=None
     warm_start_params['classifier__n_estimators'] = 1
     warm_start_params["classifier__warm_start"] = True
     warm_start_params['classifier__n_jobs'] = -2
+    # warm_start_params["classifier__max_samples"] = .6
 
+    weights = compute_class_weight(class_weight="balanced", y=y_train,
+                                   classes=list(range(exp_config["num_targets"])))
+    warm_start_params["classifier__class_weight"] = {k: v for k, v in zip(range(2), weights)}
     best_estimator = search_result.estimator.set_params(**warm_start_params)
 
     test_errors = []
