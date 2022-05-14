@@ -153,7 +153,9 @@ def random_forest():
         dict(name="CategoricalHyperparameter",
              kwargs=dict(name="classifier__n_estimators", choices=[512])),
         dict(name="CategoricalHyperparameter",
-             kwargs=dict(name="classifier__class_weight", choices=["balanced"]))
+             kwargs=dict(name="classifier__class_weight", choices=["balanced"])),
+        # dict(name="CategoricalHyperparameter",
+        #      kwargs=dict(name="classifier__max_samples", choices=[.6,.8]))
     ]
     scaler_name = "standard"
 
@@ -251,7 +253,7 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     result_path.unlink()
 
     # train model on entire dataset
-    new_pipe = pipe.set_params(**search.best_params_)
+    new_pipe: Pipeline = pipe.set_params(**search.best_params_)  # noqa
     new_pipe.fit(X=X_train, y=y_train)
 
     # log metrics on test set
