@@ -6,13 +6,14 @@ from sacred import SETTINGS
 from sklearn.experimental import enable_halving_search_cv  # noqa
 # now you can import normally from model_selection
 from sklearn.model_selection import HalvingRandomSearchCV, RandomizedSearchCV, train_test_split, \
-    GridSearchCV
+    GridSearchCV, PredefinedSplit
+
 import numpy as np
 from sklearn.pipeline import Pipeline
 from keras.wrappers.scikit_learn import KerasClassifier
 import pickle
-from drowsiness_detection.data import (get_feature_data, preprocess_feature_data,
-                                       session_type_mapping)
+from drowsiness_detection.data import (session_type_mapping,
+                                       load_preprocessed_train_val_test_splits)
 from drowsiness_detection.helpers import spec_to_config_space
 from sklearn.dummy import DummyClassifier
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
@@ -22,7 +23,6 @@ from sacred.observers import FileStorageObserver
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from drowsiness_detection import config
-from sklearn.model_selection import StratifiedKFold
 from drowsiness_detection.models import build_dummy_tf_classifier, ThreeDStandardScaler
 
 import os
@@ -59,6 +59,7 @@ def base():
     exclude_by = "a"
     num_targets = 2
     use_dummy_data = False
+    split_by_subjects = True
 
 
 @ex.named_config
@@ -130,23 +131,24 @@ def logistic_regression():
 def random_forest():
     model_selection_name = "random"
     model_name = "RandomForestClassifier"
+    # max_depth = 35
     grid_search_params = {
         # "factor": 3,
         # "max_resources": 1000,
         # "resource": 'classifier__n_estimators',
         "scoring": "accuracy",
         "return_train_score": True,
-        "n_iter": 1
+        "n_iter": 50
 
     }
     hyperparameter_specs = [
         dict(name="CategoricalHyperparameter",
              # kwargs=dict(name="classifier__criterion", choices=["gini", "entropy"])),
              kwargs=dict(name="classifier__criterion", choices=["entropy"])),
-        # dict(name="UniformIntegerHyperparameter",
-        #      kwargs=dict(name="classifier__max_depth", lower=2, upper=150, log=False)),
-        dict(name="CategoricalHyperparameter",
-             kwargs=dict(name="classifier__max_depth", choices=[35])),
+        dict(name="UniformIntegerHyperparameter",
+             kwargs=dict(name="classifier__max_depth", lower=2, upper=150, log=False)),
+        # dict(name="CategoricalHyperparameter",
+        #      kwargs=dict(name="classifier__max_depth", choices=[max_depth])),
         dict(name="CategoricalHyperparameter",
              # kwargs=dict(name="classifier__max_features", choices=["sqrt", "log2"])),
              kwargs=dict(name="classifier__max_features", choices=["sqrt"])),
@@ -155,7 +157,11 @@ def random_forest():
         dict(name="CategoricalHyperparameter",
              kwargs=dict(name="classifier__class_weight", choices=["balanced"])),
         # dict(name="CategoricalHyperparameter",
-        #      kwargs=dict(name="classifier__max_samples", choices=[.6,.8]))
+        #      kwargs=dict(name="classifier__max_samples", choices=[.6,.8])),
+        # dict(name="CategoricalHyperparameter",
+        #      kwargs=dict(name="classifier__min_samples_split", choices=[0.015, 0.03]))
+        dict(name="UniformFloatHyperparameter",
+             kwargs=dict(name="classifier__max_depth", lower=0.005, upper=0.03, log=False)),
     ]
     scaler_name = "standard"
 
@@ -201,7 +207,8 @@ def parse_scaler_name(scaler_name: str):
 @ex.automain
 def run(recording_frequency: int, window_in_sec: int, model_selection_name: str, scaler_name: str,
         grid_search_params: dict, model_name: str, exclude_by: str, hyperparameter_specs: dict,
-        seed, test_size: float, n_splits: int, num_targets: int, use_dummy_data: bool):
+        seed, test_size: float, n_splits: int, num_targets: int, use_dummy_data: bool,
+        split_by_subjects: bool):
     # set up global paths and cache dir for pipeline
     config.set_paths(frequency=recording_frequency, seconds=window_in_sec)
 
@@ -215,16 +222,21 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
         num_samples = 200
         X = np.random.random(num_samples * 300 * 23).reshape((num_samples, 300, 23))
         y = np.concatenate((np.zeros((num_samples // 2)), np.ones((num_samples // 2))))
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
+                                                            random_state=seed)
+        X_train, X_val, y_test, y_val = train_test_split(X_test, y_test, test_size=test_size,
+                                                         random_state=seed)
     else:
-        data = get_feature_data(data_path=config.PATHS.WINDOW_FEATURES)
-        X, y = preprocess_feature_data(feature_data=data,
-                                       exclude_sess_type=session_type_mapping[exclude_by],
-                                       num_targets=num_targets)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
-                                                        random_state=seed)
+        X_train, X_val, X_test, y_train, y_val, y_test = load_preprocessed_train_val_test_splits(
+            data_path=config.PATHS.WINDOW_FEATURES,
+            exclude_sess_type=session_type_mapping[exclude_by],
+            num_targets=num_targets, seed=seed, test_size=test_size,
+            split_by_subjects=split_by_subjects)
 
-    cv = StratifiedKFold(n_splits=n_splits, random_state=seed,
-                         shuffle=True)
+    split_idx = np.concatenate([np.ones(len(X_val)), np.repeat(-1, len(X_test))])
+    X_test = np.concatenate([X_val, X_test])
+    y_test = np.concatenate([y_val, y_test])
+    cv = PredefinedSplit(test_fold=split_idx)
 
     pipe = Pipeline([("scaler", scaler), ("classifier", model)])
     param_distribution = spec_to_config_space(specs=hyperparameter_specs)
@@ -232,9 +244,6 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     model_selection = parse_model_selection_name(model_selection_name=model_selection_name)
     if model_selection is GridSearchCV:
         raise NotImplementedError("Grid search does not work with hyperparameter dict.")
-        # search = model_selection(estimator=pipe,
-        #                          param_grid=param_distribution.get_hyperparameters_dict(),
-        #                          cv=cv, **grid_search_params)
     else:
         search = model_selection(estimator=pipe,
                                  param_distributions=param_distribution.get_hyperparameters_dict(),
@@ -242,7 +251,11 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     search.fit(X=X_train, y=y_train)
 
     # log best model
-    ex.info["cv_test_" + search.scoring] = float(search.best_score_)
+    print(search.cv_results_)
+    ex.info["best_cv_test_" + search.scoring] = float(
+        search.cv_results_["mean_test_score"][search.best_index_])
+    ex.info["best_cv_train_" + search.scoring] = float(
+        search.cv_results_["mean_train_score"][search.best_index_])
     ex.info["best_params"] = search.best_params_
 
     # save all search results
