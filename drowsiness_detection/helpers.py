@@ -20,12 +20,9 @@ def print_nan_intersections(df: pd.DataFrame):
         print(f"Column {column} has {len(unique_nans)} nans that appear in no other column.")
 
 
-
 def digitize(arr, shift: float = .5, label_start_index: int = 1):
     bins = [x + shift for x in range(1, 9)]
     return np.digitize(arr, bins=bins) + label_start_index
-
-
 
 
 def label_to_one_hot_like(arr, k=9):
@@ -34,7 +31,6 @@ def label_to_one_hot_like(arr, k=9):
     for i, element in enumerate(arr):
         one_hots[i, :element] = 1
     return one_hots
-
 
 
 def binarize(arr: np.ndarray, threshold: float) -> np.ndarray:

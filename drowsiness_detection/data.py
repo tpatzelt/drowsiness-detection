@@ -77,8 +77,8 @@ def window_files_train_test_split(
 
     sub_target_dir = target_dir.joinpath("identifiers")
     sub_target_dir.mkdir()
-    np.save(sub_target_dir.joinpath("train"), train_identifiers)
-    np.save(sub_target_dir.joinpath("test"), test_identifiers)
+    np.save(sub_target_dir.joinpath("train"), train_identifiers)  # noqa
+    np.save(sub_target_dir.joinpath("test"), test_identifiers)  # noqa
 
 
 def get_train_test_splits(directory: Path = config.PATHS.TRAIN_TEST_SPLIT):
@@ -87,7 +87,7 @@ def get_train_test_splits(directory: Path = config.PATHS.TRAIN_TEST_SPLIT):
     for file in sorted(directory.iterdir()):
         if file.is_dir():
             continue
-        arr = np.load(file=file)
+        arr = np.load(file=file)  # noqa
         if "test" in file.name:
             test_data.append(arr)
         elif "train" in file.name:
@@ -119,8 +119,8 @@ def get_data_not_splitted(directory: Path = config.PATHS.TRAIN_TEST_SPLIT):
 
 def get_identifier_array_train_test_split(
         directory: Path = config.PATHS.SPLIT_IDENTIFIER):
-    train_idents = np.load(directory.joinpath("train.npy"))
-    test_idents = np.load(directory.joinpath("test.npy"))
+    train_idents = np.load(directory.joinpath("train.npy"))  # noqa
+    test_idents = np.load(directory.joinpath("test.npy"))  # noqa
     return train_idents, test_idents
 
 
@@ -172,7 +172,7 @@ def get_feature_data(data_path: Path = config.PATHS.WINDOW_FEATURES):
     all_arrays = []
     for feature_file in data_path.iterdir():
         sess_type, subject_id = filename_to_session_type_and_id(feature_file)
-        features = np.load(feature_file)
+        features = np.load(feature_file)  # noqa
         targets = get_kss_labels_for_feature_file(feature_file)
         sess_types = np.repeat(session_type_mapping[sess_type], len(targets))
         subject_ids = np.repeat(subject_id, len(targets))
@@ -225,7 +225,7 @@ def get_data_for_nn(data_path: Path = config.PATHS.WINDOW_DATA):
     """Loads all files under data_path, adds the session type, subject id and kss score as new columns. """
     for feature_file in data_path.iterdir():
         sess_type, subject_id = filename_to_session_type_and_id(feature_file)
-        features = np.load(feature_file)  # (355,301,23)
+        features = np.load(feature_file)  # (355,301,23)  # noqa
         targets = get_kss_labels_for_feature_file(feature_file)  # (355,)
         if features.shape[0] != targets.shape[0]:
             raise ValueError(f"{features.shape} vs {targets.shape}")
@@ -268,9 +268,11 @@ def merge_nn_data(data_generator):
     return np.concatenate(Xs), np.concatenate(ys)
 
 
-def load_nn_data(exclude_by: str = "a", data_path: Path = config.PATHS.WINDOW_DATA):
+def load_nn_data(exclude_by: str = "a", data_path: Path = config.PATHS.WINDOW_DATA,
+                 num_targets: int = 2):
     data_gen = get_data_for_nn(data_path=data_path)
-    data_gen = preprocess_data_for_nn(data_generator=data_gen, exclude_sess_type=exclude_by)
+    data_gen = preprocess_data_for_nn(data_generator=data_gen, exclude_sess_type=exclude_by,
+                                      num_targets=num_targets)
     for _ in range(50):
         next(data_gen)
     return merge_nn_data(data_generator=data_gen)
