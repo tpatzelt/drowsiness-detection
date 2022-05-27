@@ -137,7 +137,7 @@ def random_forest():
         # "resource": 'classifier__n_estimators',
         "scoring": "accuracy",
         "return_train_score": True,
-        "n_iter": 50
+        "n_iter": 1
 
     }
     scaler_name = "standard"
@@ -153,7 +153,7 @@ def random_forest():
              # kwargs=dict(name="classifier__max_features", choices=["sqrt", "log2"])),
              kwargs=dict(name="classifier__max_features", choices=["sqrt"])),
         dict(name="CategoricalHyperparameter",
-             kwargs=dict(name="classifier__n_estimators", choices=[512])),
+             kwargs=dict(name="classifier__n_estimators", choices=[12])),
         dict(name="CategoricalHyperparameter",
              kwargs=dict(name="classifier__class_weight", choices=["balanced"])),
         # dict(name="CategoricalHyperparameter",
@@ -161,7 +161,7 @@ def random_forest():
         # dict(name="CategoricalHyperparameter",
         #      kwargs=dict(name="classifier__min_samples_split", choices=[0.015, 0.03]))
         dict(name="UniformFloatHyperparameter",
-             kwargs=dict(name="classifier__max_depth", lower=0.005, upper=0.03, log=False)),
+             kwargs=dict(name="classifier__min_samples_split", lower=0.005, upper=0.03, log=False)),
     ]
 
 
@@ -232,9 +232,13 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
             num_targets=num_targets, seed=seed, test_size=test_size,
             split_by_subjects=split_by_subjects)
 
+    # need to have extra validation set so that we have the indices of the subjects,
+    # then put together with training set
     split_idx = np.concatenate([np.ones(len(X_val)), np.repeat(-1, len(X_test))])
     X_test = np.concatenate([X_val, X_test])
     y_test = np.concatenate([y_val, y_test])
+    print(f"X_train shape: {X_train.shape}, y_train shape: {y_train.shape}")
+    print(f"X_test shape: {X_test.shape}, y_test shape: {y_test.shape}")
     cv = PredefinedSplit(test_fold=split_idx)
 
     pipe = Pipeline([("scaler", scaler), ("classifier", model)])

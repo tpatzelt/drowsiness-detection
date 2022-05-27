@@ -181,8 +181,7 @@ def get_feature_data(data_path: Path = config.PATHS.WINDOW_FEATURES):
     return np.concatenate(all_arrays)
 
 
-def preprocess_feature_data(feature_data: np.ndarray, exclude_sess_type: int, num_targets: int,
-                            keep_extra_cols: int):
+def preprocess_feature_data(feature_data: np.ndarray, exclude_sess_type: int, num_targets: int):
     """Preprocessing the feature data includes removing NaNs,
     binarize kss scores and split into features and targets."""
     # col -3 is targets, -2 is sess type and -1 is subject id
@@ -211,14 +210,10 @@ def preprocess_feature_data(feature_data: np.ndarray, exclude_sess_type: int, nu
     feature_data[:, -3] = targets
     # remove one session type
     feature_data = feature_data[feature_data[:, -2] != exclude_sess_type]
-    if keep_extra_cols:
-        X = feature_data
-        X = np.delete(X, -3, 1)  # delete labels
-        y = feature_data[:, -3]
-    else:
-        X = feature_data[:, :-3]
-        y = feature_data[:, -3]
-    return X, y
+    X = feature_data[:, :-3]
+    y = feature_data[:, -3]
+    subject_data = feature_data[:, -2:]
+    return X, y, subject_data
 
 
 def get_data_for_nn(data_path: Path = config.PATHS.WINDOW_DATA):
@@ -300,7 +295,7 @@ def load_experiment_objects(experiment_id: int):
     return config, best_model, search_results
 
 
-def train_test_split_by_subjects(X, y, num_targets, test_size):
+def train_test_split_by_subjects(X, y, num_targets, test_size, subject_data):
     if num_targets == 2:
         MIN_LABELS = 0
         MAX_LABELS = 1
@@ -309,27 +304,31 @@ def train_test_split_by_subjects(X, y, num_targets, test_size):
         MAX_LABELS = num_targets
     train, test = [], []
     train_ids, test_ids = [], []
+    train_subject_info, test_subject_info = [], []
     test_labels, train_labels = np.empty(0), np.empty(0)
     if MIN_LABELS == 0:
         bins = np.linspace(MIN_LABELS, MAX_LABELS + 1, MAX_LABELS + 2) - 0.5
     else:
         bins = np.linspace(MIN_LABELS, MAX_LABELS + 1, MAX_LABELS + 1) - 0.5
-    subject_ids = np.unique(X[:, -1])
+    subject_ids = np.unique(subject_data[:, -1])
     np.random.shuffle(subject_ids)
     for subject_id in subject_ids:
-        mask = X[:, -1] == subject_id
+        mask = subject_data[:, -1] == subject_id
         subject_rows = X[mask]
         labels = y[mask]
+        subject_info_rows = subject_data[mask]
         assert len(labels) == len(subject_rows)
         if not train:
             train.append(subject_rows)
             train_labels = np.concatenate([train_labels, labels])
             train_ids.append(subject_id)
+            train_subject_info.append(subject_info_rows)
             continue
         if not test:
             test.append(subject_rows)
             test_labels = np.concatenate([test_labels, labels])
             test_ids.append(subject_id)
+            test_subject_info.append(subject_info_rows)
             continue
         test_labels_for_dist = np.concatenate([test_labels, labels])
         train_labels_for_dist = np.concatenate([train_labels, labels])
@@ -344,44 +343,56 @@ def train_test_split_by_subjects(X, y, num_targets, test_size):
             train.append(subject_rows)
             train_labels = np.concatenate([train_labels, labels])
             train_ids.append(subject_id)
+            train_subject_info.append(subject_info_rows)
+
         else:
             test.append(subject_rows)
             test_labels = np.concatenate([test_labels, labels])
             test_ids.append(subject_id)
+            test_subject_info.append(subject_info_rows)
 
         assert len(labels) == len(subject_rows)
         assert len(labels) == len(subject_rows)
-    train = np.concatenate(train.copy())
-    test = np.concatenate(test.copy())
-    print([x.shape for x in (train, train_labels, test, test_labels)])
+    train = np.concatenate(train)
+    test = np.concatenate(test)
+    train_subject_info = np.concatenate(train_subject_info)
+    test_subject_info = np.concatenate(test_subject_info)
+    # print([x.shape for x in (train, train_labels, test, test_labels)])
     assert len(train) == len(train_labels)
     assert (len(test) == len(test_labels))
     return train, test, train_labels, test_labels, (
-        np.array(train_ids).astype(int), np.array(test_ids).astype(int))
+        np.array(train_ids).astype(int), np.array(test_ids).astype(int)), (
+           train_subject_info, test_subject_info)
 
 
 def load_preprocessed_train_test_splits(data_path, exclude_sess_type, num_targets, seed, test_size,
                                         split_by_subjects: int = False):
     data = get_feature_data(data_path=data_path)
-    X, y = preprocess_feature_data(feature_data=data,
-                                   exclude_sess_type=exclude_sess_type,
-                                   num_targets=num_targets, keep_extra_cols=split_by_subjects)
+    X, y, subject_data = preprocess_feature_data(feature_data=data,
+                                                 exclude_sess_type=exclude_sess_type,
+                                                 num_targets=num_targets)
     if split_by_subjects:
-        X_train, X_test, y_train, y_test, _ = train_test_split_by_subjects(X, y,
-                                                                           num_targets=num_targets,
-                                                                           test_size=test_size)
+        X_train, X_test, y_train, y_test, _, (
+        train_subject_info, test_subject_info) = train_test_split_by_subjects(X, y,
+                                                                              num_targets=num_targets,
+                                                                              test_size=test_size,
+                                                                              subject_data=subject_data)
+        return X_train, X_test, y_train, y_test, (train_subject_info, test_subject_info)
     else:
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
                                                             random_state=seed)
-    return X_train, X_test, y_train, y_test
+        return X_train, X_test, y_train, y_test, None
 
 
 def load_preprocessed_train_val_test_splits(data_path, exclude_sess_type, num_targets, seed,
                                             test_size, split_by_subjects: int = True):
-    X_train, X_test, y_train, y_test = load_preprocessed_train_test_splits(
+    X_train, X_test, y_train, y_test, (
+    train_subject_info, test_subject_info) = load_preprocessed_train_test_splits(
         data_path, exclude_sess_type, num_targets, seed, test_size, split_by_subjects)
-    X_train, X_val, y_train, y_val, _ = train_test_split_by_subjects(X_train.copy(), y_train.copy(),
-                                                                     num_targets=2, test_size=0.25)
+    X_train, X_val, y_train, y_val, _, _ = train_test_split_by_subjects(X_train, y_train,
+                                                                        num_targets=2,
+                                                                        test_size=0.25,
+                                                                        subject_data=train_subject_info)
     return X_train, X_val, X_test, y_train, y_val, y_test
 
 

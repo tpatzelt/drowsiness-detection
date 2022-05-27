@@ -64,9 +64,9 @@ def run(num_targets):
     scaler = ThreeDStandardScaler()
     # load data
     data = get_feature_data(data_path=config.PATHS.WINDOW_FEATURES)
-    X, y = preprocess_feature_data(feature_data=data,
-                                   exclude_sess_type=session_type_mapping[exclude_by],
-                                   num_targets=num_targets)
+    X, y, subject_data = preprocess_feature_data(feature_data=data,
+                                                 exclude_sess_type=session_type_mapping[exclude_by],
+                                                 num_targets=num_targets)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
                                                         random_state=seed)
 

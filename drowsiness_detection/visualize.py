@@ -330,12 +330,13 @@ def plot_roc_curve_from_log_dir(experiment_id=21, plot_train_roc: bool = False, 
     config.set_paths(30, window_size)
 
     # load data
-    X_train, X_test, y_train, y_test = load_preprocessed_train_test_splits(
+    X_train, X_test, y_train, y_test, _ = load_preprocessed_train_test_splits(
         data_path=config.PATHS.WINDOW_FEATURES,
         exclude_sess_type=session_type_mapping[exp_config["exclude_by"]],
         num_targets=exp_config["num_targets"],
         seed=exp_config["seed"],
-        test_size=exp_config["test_size"])
+        test_size=exp_config["test_size"],
+        split_by_subjects=exp_config["split_by_subjects"])
 
     RocCurveDisplay.from_estimator(estimator=best_estimator, X=X_test, y=y_test,
                                    name=f"RF-{window_size}s" + ("(test)" if plot_train_roc else ""),
