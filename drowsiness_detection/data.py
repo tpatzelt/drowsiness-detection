@@ -19,6 +19,7 @@ label_names_dict = {  # num_targets: label_names
     9: [str(num) for num in range(1, 10)]
 }
 
+
 def filename_to_session_type_and_id(filename: Path):
     a = filename.name
     elements = a.split("_")
@@ -180,7 +181,8 @@ def get_feature_data(data_path: Path = config.PATHS.WINDOW_FEATURES):
     return np.concatenate(all_arrays)
 
 
-def preprocess_feature_data(feature_data: np.ndarray, exclude_sess_type: int, num_targets: int):
+def preprocess_feature_data(feature_data: np.ndarray, exclude_sess_type: int, num_targets: int,
+                            keep_extra_cols: int):
     """Preprocessing the feature data includes removing NaNs,
     binarize kss scores and split into features and targets."""
     # col -3 is targets, -2 is sess type and -1 is subject id
@@ -200,17 +202,22 @@ def preprocess_feature_data(feature_data: np.ndarray, exclude_sess_type: int, nu
         third = 7
         forth = 9
         fifth = 10
-        targets = np.digitize(targets, bins=[first,second, third, forth, fifth])
+        targets = np.digitize(targets, bins=[first, second, third, forth, fifth])
     elif num_targets == 9:
-        targets = np.digitize(targets, bins=range(1,10))
+        targets = np.digitize(targets, bins=range(1, 10))
     else:
         raise ValueError(f"num targets {num_targets} not supported.")
 
     feature_data[:, -3] = targets
     # remove one session type
     feature_data = feature_data[feature_data[:, -2] != exclude_sess_type]
-    X = feature_data[:, :-3]
-    y = feature_data[:, -3]
+    if keep_extra_cols:
+        X = feature_data
+        X = np.delete(X, -3, 1)  # delete labels
+        y = feature_data[:, -3]
+    else:
+        X = feature_data[:, :-3]
+        y = feature_data[:, -3]
     return X, y
 
 
@@ -291,14 +298,89 @@ def load_experiment_objects(experiment_id: int):
     return config, best_model, search_results
 
 
-def load_preprocessed_train_test_splits(data_path, exclude_sess_type, num_targets, seed, test_size):
+def train_test_split_by_subjects(X, y, num_targets, test_size):
+    if num_targets == 2:
+        MIN_LABELS = 0
+        MAX_LABELS = 1
+    else:
+        MIN_LABELS = 1
+        MAX_LABELS = num_targets
+    train, test = [], []
+    train_ids, test_ids = [], []
+    test_labels, train_labels = np.empty(0), np.empty(0)
+    if MIN_LABELS == 0:
+        bins = np.linspace(MIN_LABELS, MAX_LABELS + 1, MAX_LABELS + 2) - 0.5
+    else:
+        bins = np.linspace(MIN_LABELS, MAX_LABELS + 1, MAX_LABELS + 1) - 0.5
+    subject_ids = np.unique(X[:, -1])
+    np.random.shuffle(subject_ids)
+    for subject_id in subject_ids:
+        mask = X[:, -1] == subject_id
+        subject_rows = X[mask]
+        labels = y[mask]
+        assert len(labels) == len(subject_rows)
+        if not train:
+            train.append(subject_rows)
+            train_labels = np.concatenate([train_labels, labels])
+            train_ids.append(subject_id)
+            continue
+        if not test:
+            test.append(subject_rows)
+            test_labels = np.concatenate([test_labels, labels])
+            test_ids.append(subject_id)
+            continue
+        test_labels_for_dist = np.concatenate([test_labels, labels])
+        train_labels_for_dist = np.concatenate([train_labels, labels])
+        original_test_hist = np.histogram(test_labels, bins=bins)[0]
+        original_train_hist = np.histogram(train_labels, bins=bins)[0]
+        test_hist = np.histogram(test_labels_for_dist, bins=bins)[0]
+        train_hist = np.histogram(train_labels_for_dist, bins=bins)[0]
+
+        dist_if_train_added = np.linalg.norm(train_hist - original_test_hist)
+        dist_if_test_added = np.linalg.norm(test_hist - original_train_hist)
+        if dist_if_test_added > dist_if_train_added or (len(test_labels) / len(X)) > test_size:
+            train.append(subject_rows)
+            train_labels = np.concatenate([train_labels, labels])
+            train_ids.append(subject_id)
+        else:
+            test.append(subject_rows)
+            test_labels = np.concatenate([test_labels, labels])
+            test_ids.append(subject_id)
+
+        assert len(labels) == len(subject_rows)
+        assert len(labels) == len(subject_rows)
+    train = np.concatenate(train.copy())
+    test = np.concatenate(test.copy())
+    print([x.shape for x in (train, train_labels, test, test_labels)])
+    assert len(train) == len(train_labels)
+    assert (len(test) == len(test_labels))
+    return train, test, train_labels, test_labels, (
+        np.array(train_ids).astype(int), np.array(test_ids).astype(int))
+
+
+def load_preprocessed_train_test_splits(data_path, exclude_sess_type, num_targets, seed, test_size,
+                                        split_by_subjects: int = False):
     data = get_feature_data(data_path=data_path)
     X, y = preprocess_feature_data(feature_data=data,
                                    exclude_sess_type=exclude_sess_type,
-                                   num_targets=num_targets)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
-                                                        random_state=seed)
+                                   num_targets=num_targets, keep_extra_cols=split_by_subjects)
+    if split_by_subjects:
+        X_train, X_test, y_train, y_test, _ = train_test_split_by_subjects(X, y,
+                                                                           num_targets=num_targets,
+                                                                           test_size=test_size)
+    else:
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
+                                                            random_state=seed)
     return X_train, X_test, y_train, y_test
+
+
+def load_preprocessed_train_val_test_splits(data_path, exclude_sess_type, num_targets, seed,
+                                            test_size, split_by_subjects: int = True):
+    X_train, X_test, y_train, y_test = load_preprocessed_train_test_splits(
+        data_path, exclude_sess_type, num_targets, seed, test_size, split_by_subjects)
+    X_train, X_val, y_train, y_val, _ = train_test_split_by_subjects(X_train.copy(), y_train.copy(),
+                                                                     num_targets=2, test_size=0.25)
+    return X_train, X_val, X_test, y_train, y_val, y_test
 
 
 if __name__ == '__main__':
