@@ -131,7 +131,6 @@ def logistic_regression():
 def random_forest():
     model_selection_name = "random"
     model_name = "RandomForestClassifier"
-    # max_depth = 35
     grid_search_params = {
         # "factor": 3,
         # "max_resources": 1000,
@@ -141,6 +140,7 @@ def random_forest():
         "n_iter": 50
 
     }
+    scaler_name = "standard"
     hyperparameter_specs = [
         dict(name="CategoricalHyperparameter",
              # kwargs=dict(name="classifier__criterion", choices=["gini", "entropy"])),
@@ -163,7 +163,6 @@ def random_forest():
         dict(name="UniformFloatHyperparameter",
              kwargs=dict(name="classifier__max_depth", lower=0.005, upper=0.03, log=False)),
     ]
-    scaler_name = "standard"
 
 
 def parse_model_name(model_name: str):
@@ -250,7 +249,7 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
                                  cv=cv, **grid_search_params, random_state=seed)
     search.fit(X=X_train, y=y_train)
 
-    # log best model
+    # log scores of best model
     print(search.cv_results_)
     ex.info["best_cv_test_" + search.scoring] = float(
         search.cv_results_["mean_test_score"][search.best_index_])
@@ -269,7 +268,7 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     new_pipe: Pipeline = pipe.set_params(**search.best_params_)  # noqa
     new_pipe.fit(X=X_train, y=y_train)
 
-    # log metrics on test set
+    # log metrics on test and train set
     train_score = new_pipe.score(X_train, y_train)
     ex.info["train_" + search.scoring] = float(train_score)
     test_score = new_pipe.score(X_test, y_test)
