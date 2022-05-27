@@ -390,8 +390,9 @@ def load_preprocessed_train_val_test_splits(data_path, exclude_sess_type, num_ta
     train_subject_info, test_subject_info) = load_preprocessed_train_test_splits(
         data_path, exclude_sess_type, num_targets, seed, test_size, split_by_subjects)
     X_train, X_val, y_train, y_val, _, _ = train_test_split_by_subjects(X_train, y_train,
-                                                                        num_targets=2,
-                                                                        test_size=0.25,
+                                                                        num_targets=num_targets,
+                                                                        test_size=test_size / (
+                                                                                    1 - test_size),
                                                                         subject_data=train_subject_info)
     return X_train, X_val, X_test, y_train, y_val, y_test
 

@@ -235,8 +235,8 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     # need to have extra validation set so that we have the indices of the subjects,
     # then put together with training set
     split_idx = np.concatenate([np.ones(len(X_val)), np.repeat(-1, len(X_test))])
-    X_test = np.concatenate([X_val, X_test])
-    y_test = np.concatenate([y_val, y_test])
+    X_train = np.concatenate([X_val, X_train])
+    y_train = np.concatenate([y_val, y_train])
     print(f"X_train shape: {X_train.shape}, y_train shape: {y_train.shape}")
     print(f"X_test shape: {X_test.shape}, y_test shape: {y_test.shape}")
     cv = PredefinedSplit(test_fold=split_idx)
