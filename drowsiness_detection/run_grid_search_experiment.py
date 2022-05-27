@@ -38,7 +38,7 @@ ex.observers.append(FileStorageObserver(Path(__file__).parent.parent.joinpath("l
 @ex.config
 def base():
     seed = 123
-    test_size = .2
+    test_size = .3
     model_selection_name = "halving-random"
     scaler_name = ""
     recording_frequency = None
@@ -161,7 +161,7 @@ def random_forest():
         # dict(name="CategoricalHyperparameter",
         #      kwargs=dict(name="classifier__min_samples_split", choices=[0.015, 0.03]))
         dict(name="UniformFloatHyperparameter",
-             kwargs=dict(name="classifier__min_samples_split", lower=0.005, upper=0.03, log=False)),
+             kwargs=dict(name="classifier__min_samples_split", lower=0.015, upper=0.04, log=False)),
     ]
 
 
@@ -254,7 +254,6 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     search.fit(X=X_train, y=y_train)
 
     # log scores of best model
-    print(search.cv_results_)
     ex.info["best_cv_test_" + search.scoring] = float(
         search.cv_results_["mean_test_score"][search.best_index_])
     ex.info["best_cv_train_" + search.scoring] = float(
