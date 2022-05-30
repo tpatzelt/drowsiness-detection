@@ -39,7 +39,7 @@ ex.observers.append(FileStorageObserver(Path(__file__).parent.parent.joinpath("l
 @ex.config
 def base():
     seed = 123
-    test_size = .3
+    test_size = .2
     model_selection_name = "halving-random"
     scaler_name = ""
     recording_frequency = None
@@ -140,7 +140,7 @@ def random_forest():
         # "resource": 'classifier__n_estimators',
         "scoring": "accuracy",
         "return_train_score": True,
-        "n_iter": 100
+        "n_iter": 300
 
     }
     scaler_name = "standard"
@@ -298,11 +298,6 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
 
     # load model
     model = parse_model_name(model_name=model_name, model_init_params=model_init_params)
-    if nn_experiment and 0:
-        model = TransformedTargetRegressor(regressor=model,
-                                           inverse_func=np.argmax,
-                                           # Function that remaps your labels
-                                           check_inverse=False)
     scaler = parse_scaler_name(scaler_name=scaler_name)
     # load data
     if use_dummy_data:
