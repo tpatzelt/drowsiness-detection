@@ -11,7 +11,7 @@ from sklearn.model_selection import HalvingRandomSearchCV, RandomizedSearchCV, t
 import numpy as np
 from sklearn.pipeline import Pipeline
 from keras.wrappers.scikit_learn import KerasClassifier
-import pickle
+import dill as pickle
 from drowsiness_detection.data import (session_type_mapping,
                                        load_preprocessed_train_val_test_splits)
 from drowsiness_detection.helpers import spec_to_config_space
@@ -23,7 +23,8 @@ from sacred.observers import FileStorageObserver
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from drowsiness_detection import config
-from drowsiness_detection.models import build_dummy_tf_classifier, ThreeDStandardScaler
+from drowsiness_detection.models import build_dummy_tf_classifier, ThreeDStandardScaler, \
+    build_dense_model
 
 import os
 
@@ -53,6 +54,7 @@ def base():
         # "return_train_score": True
 
     }
+    fit_params = {}
     model_name = None
     hyperparameter_specs = None
 
@@ -165,7 +167,26 @@ def random_forest():
     ]
 
 
-def parse_model_name(model_name: str):
+@ex.named_config
+def dense_nn():
+    use_dummy_data = True
+    model_selection_name = "random"
+    model_name = "DenseNN"
+    grid_search_params = {
+        "scoring": "accuracy",
+        "return_train_score": True,
+        "n_iter": 2
+    }
+    fit_params = {"classifier__epochs": 1, "classifier__batch_size": 128}
+    model_init_params = {"input_shape": (20, 300, 23)}
+    scaler_name = "3D-standard"
+    hyperparameter_specs = [
+        dict(name="UniformIntegerHyperparameter",
+             kwargs=dict(name="classifier__num_hidden", lower=32, upper=2024, log=False)),
+    ]
+
+
+def parse_model_name(model_name: str, model_init_params={}):
     if model_name == "RandomForestClassifier":
         model = RandomForestClassifier()
     elif model_name == "LogisticRegression":
@@ -174,6 +195,11 @@ def parse_model_name(model_name: str):
         model = DummyClassifier()
     elif model_name == "DummyTFClassifier":
         model = KerasClassifier(build_fn=build_dummy_tf_classifier)
+    elif model_name == "DenseNN":
+        def model_fn(num_hidden):
+            return build_dense_model(num_hidden=num_hidden, **model_init_params)
+
+        model = KerasClassifier(build_fn=model_fn)
     else:
         raise ValueError
     return model
@@ -207,14 +233,14 @@ def parse_scaler_name(scaler_name: str):
 def run(recording_frequency: int, window_in_sec: int, model_selection_name: str, scaler_name: str,
         grid_search_params: dict, model_name: str, exclude_by: str, hyperparameter_specs: dict,
         seed, test_size: float, n_splits: int, num_targets: int, use_dummy_data: bool,
-        split_by_subjects: bool):
+        split_by_subjects: bool, fit_params: dict, model_init_params: dict):
     # set up global paths and cache dir for pipeline
     config.set_paths(frequency=recording_frequency, seconds=window_in_sec)
 
     print(f"Starting experiment on {window_in_sec} sec data with {num_targets} targets.")
 
     # load model
-    model = parse_model_name(model_name=model_name)
+    model = parse_model_name(model_name=model_name, model_init_params=model_init_params)
     scaler = parse_scaler_name(scaler_name=scaler_name)
     # load data
     if use_dummy_data:
@@ -223,8 +249,12 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
         y = np.concatenate((np.zeros((num_samples // 2)), np.ones((num_samples // 2))))
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
                                                             random_state=seed)
-        X_train, X_val, y_test, y_val = train_test_split(X_test, y_test, test_size=test_size,
-                                                         random_state=seed)
+        X_train, X_val, y_train, y_val = train_test_split(X_train, y_train,
+                                                          test_size=test_size * (1 - test_size),
+                                                          random_state=seed)
+        print(f"X_train shape: {X_train.shape}, y_train shape: {y_train.shape}")
+        print(f"X_test shape: {X_test.shape}, y_test shape: {y_test.shape}")
+        print(f"X_val shape: {X_val.shape}, y_val shape: {y_val.shape}")
     else:
         X_train, X_val, X_test, y_train, y_val, y_test = load_preprocessed_train_val_test_splits(
             data_path=config.PATHS.WINDOW_FEATURES,
@@ -251,7 +281,7 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
         search = model_selection(estimator=pipe,
                                  param_distributions=param_distribution.get_hyperparameters_dict(),
                                  cv=cv, **grid_search_params, random_state=seed)
-    search.fit(X=X_train, y=y_train)
+    search.fit(X=X_train, y=y_train, **fit_params)
 
     # log scores of best model
     ex.info["best_cv_test_" + search.scoring] = float(
