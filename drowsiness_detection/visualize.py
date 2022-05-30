@@ -325,7 +325,6 @@ def plot_roc_curve_from_log_dir(experiment_id=21, plot_train_roc: bool = False, 
         fig, ax = plt.subplots()
 
     exp_config, best_estimator, _ = load_experiment_objects(experiment_id=experiment_id)
-
     window_size = exp_config["window_in_sec"]
     config.set_paths(30, window_size)
 
@@ -364,7 +363,7 @@ def plot_learning_curve_from_log_dir(experiment_id, n_estimator_options, ax=None
     window_size = exp_config["window_in_sec"]
     config.set_paths(30, window_size)
 
-    X_train, X_test, y_train, y_test = load_preprocessed_train_test_splits(
+    X_train, X_test, y_train, y_test, _ = load_preprocessed_train_test_splits(
         data_path=config.PATHS.WINDOW_FEATURES,
         exclude_sess_type=session_type_mapping[exp_config["exclude_by"]],
         num_targets=exp_config["num_targets"],

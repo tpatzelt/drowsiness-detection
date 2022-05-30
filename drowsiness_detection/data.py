@@ -367,16 +367,21 @@ def train_test_split_by_subjects(X, y, num_targets, test_size, subject_data):
 
 def load_preprocessed_train_test_splits(data_path, exclude_sess_type, num_targets, seed, test_size,
                                         split_by_subjects: int = False):
+    np.random.seed(seed)
+    random.seed(seed)
+
     data = get_feature_data(data_path=data_path)
     X, y, subject_data = preprocess_feature_data(feature_data=data,
                                                  exclude_sess_type=exclude_sess_type,
                                                  num_targets=num_targets)
     if split_by_subjects:
         X_train, X_test, y_train, y_test, _, (
-        train_subject_info, test_subject_info) = train_test_split_by_subjects(X, y,
-                                                                              num_targets=num_targets,
-                                                                              test_size=test_size,
-                                                                              subject_data=subject_data)
+            train_subject_info, test_subject_info) = train_test_split_by_subjects(X, y,
+                                                                                  num_targets=num_targets,
+                                                                                  test_size=test_size,
+                                                                                  subject_data=subject_data)
+        # print(f"X_train shape: {X_train.shape}, y_train shape: {y_train.shape}")
+        # print(f"X_test shape: {X_test.shape}, y_test shape: {y_test.shape}")
         return X_train, X_test, y_train, y_test, (train_subject_info, test_subject_info)
     else:
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
