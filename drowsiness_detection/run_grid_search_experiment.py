@@ -7,13 +7,13 @@ from sklearn.experimental import enable_halving_search_cv  # noqa
 # now you can import normally from model_selection
 from sklearn.model_selection import HalvingRandomSearchCV, RandomizedSearchCV, train_test_split, \
     GridSearchCV, PredefinedSplit
-
 import numpy as np
 from sklearn.pipeline import Pipeline
 from keras.wrappers.scikit_learn import KerasClassifier
 import dill as pickle
 from drowsiness_detection.data import (session_type_mapping,
-                                       load_preprocessed_train_val_test_splits)
+                                       load_preprocessed_train_val_test_splits,
+                                       load_preprocessed_train_val_test_splits_nn)
 from drowsiness_detection.helpers import spec_to_config_space
 from sklearn.dummy import DummyClassifier
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
@@ -24,7 +24,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from drowsiness_detection import config
 from drowsiness_detection.models import build_dummy_tf_classifier, ThreeDStandardScaler, \
-    build_dense_model
+    build_dense_model, build_lstm_model, build_cnn_model
 
 import os
 
@@ -62,6 +62,7 @@ def base():
     num_targets = 2
     use_dummy_data = False
     split_by_subjects = True
+    nn_experiment = False
 
 
 @ex.named_config
@@ -169,20 +170,64 @@ def random_forest():
 
 @ex.named_config
 def dense_nn():
-    use_dummy_data = True
+    nn_experiment = True
     model_selection_name = "random"
     model_name = "DenseNN"
     grid_search_params = {
         "scoring": "accuracy",
         "return_train_score": True,
-        "n_iter": 2
+        "n_iter": 20
     }
-    fit_params = {"classifier__epochs": 1, "classifier__batch_size": 128}
+    fit_params = {"classifier__epochs": 30, "classifier__batch_size": 10}
     model_init_params = {"input_shape": (20, 300, 23)}
     scaler_name = "3D-standard"
     hyperparameter_specs = [
         dict(name="UniformIntegerHyperparameter",
              kwargs=dict(name="classifier__num_hidden", lower=32, upper=2024, log=False)),
+    ]
+
+
+@ex.named_config
+def cnn():
+    nn_experiment = True
+    model_selection_name = "random"
+    model_name = "CNN"
+    grid_search_params = {
+        "scoring": "accuracy",
+        "return_train_score": True,
+        "n_iter": 1
+    }
+    fit_params = {"classifier__epochs": 1, "classifier__batch_size": 10}
+    model_init_params = {"input_shape": (20, 300, 23)}
+    scaler_name = "3D-standard"
+    hyperparameter_specs = [
+        dict(name="UniformIntegerHyperparameter",
+             kwargs=dict(name="classifier__num_filters", lower=16, upper=128, log=False)),
+        dict(name="CategoricalHyperparameter",
+             kwargs=dict(name="classifier__kernel_size", choices=[(2, 1), (3, 1), (5, 1)])),
+        dict(name="CategoricalHyperparameter",
+             kwargs=dict(name="classifier__stride", choices=[(2, 1), (3, 1), (5, 1)])),
+    ]
+
+
+@ex.named_config
+def lstm():
+    nn_experiment = True
+    model_selection_name = "random"
+    model_name = "LSTM"
+    grid_search_params = {
+        "scoring": "accuracy",
+        "return_train_score": True,
+        "n_iter": 20
+    }
+    fit_params = {"classifier__epochs": 30, "classifier__batch_size": 10}
+    model_init_params = {"input_shape": (20, 300, 23)}
+    scaler_name = "3D-standard"
+    hyperparameter_specs = [
+        dict(name="UniformIntegerHyperparameter",
+             kwargs=dict(name="classifier__lstm1_units", lower=3, upper=4, log=False)),
+        dict(name="UniformIntegerHyperparameter",
+             kwargs=dict(name="classifier__lstm2_units", lower=3, upper=4, log=False)),
     ]
 
 
@@ -198,6 +243,18 @@ def parse_model_name(model_name: str, model_init_params={}):
     elif model_name == "DenseNN":
         def model_fn(num_hidden):
             return build_dense_model(num_hidden=num_hidden, **model_init_params)
+
+        model = KerasClassifier(build_fn=model_fn)
+    elif model_name == "CNN":
+        def model_fn(kernel_size, stride, num_filters):
+            return build_cnn_model(kernel_size=kernel_size, stride=stride,
+                                   num_filters=num_filters ** model_init_params)
+
+        model = KerasClassifier(build_fn=model_fn)
+    elif model_name == "LSTM":
+        def model_fn(lstm1_units, lstm2_units):
+            return build_lstm_model(lstm1_units=lstm1_units, lstm2_units=lstm2_units,
+                                    **model_init_params)
 
         model = KerasClassifier(build_fn=model_fn)
     else:
@@ -233,7 +290,7 @@ def parse_scaler_name(scaler_name: str):
 def run(recording_frequency: int, window_in_sec: int, model_selection_name: str, scaler_name: str,
         grid_search_params: dict, model_name: str, exclude_by: str, hyperparameter_specs: dict,
         seed, test_size: float, n_splits: int, num_targets: int, use_dummy_data: bool,
-        split_by_subjects: bool, fit_params: dict, model_init_params: dict):
+        split_by_subjects: bool, fit_params: dict, model_init_params: dict, nn_experiment: bool):
     # set up global paths and cache dir for pipeline
     config.set_paths(frequency=recording_frequency, seconds=window_in_sec)
 
@@ -241,6 +298,11 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
 
     # load model
     model = parse_model_name(model_name=model_name, model_init_params=model_init_params)
+    if nn_experiment and 0:
+        model = TransformedTargetRegressor(regressor=model,
+                                           inverse_func=np.argmax,
+                                           # Function that remaps your labels
+                                           check_inverse=False)
     scaler = parse_scaler_name(scaler_name=scaler_name)
     # load data
     if use_dummy_data:
@@ -252,21 +314,26 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
         X_train, X_val, y_train, y_val = train_test_split(X_train, y_train,
                                                           test_size=test_size * (1 - test_size),
                                                           random_state=seed)
-        print(f"X_train shape: {X_train.shape}, y_train shape: {y_train.shape}")
-        print(f"X_test shape: {X_test.shape}, y_test shape: {y_test.shape}")
-        print(f"X_val shape: {X_val.shape}, y_val shape: {y_val.shape}")
     else:
-        X_train, X_val, X_test, y_train, y_val, y_test = load_preprocessed_train_val_test_splits(
-            data_path=config.PATHS.WINDOW_FEATURES,
-            exclude_sess_type=session_type_mapping[exclude_by],
-            num_targets=num_targets, seed=seed, test_size=test_size,
-            split_by_subjects=split_by_subjects)
+        if nn_experiment:
+            X_train, X_val, X_test, y_train, y_val, y_test = load_preprocessed_train_val_test_splits_nn(
+                data_path=config.PATHS.WINDOW_DATA,
+                exclude_sess_type=session_type_mapping[exclude_by],
+                num_targets=num_targets, seed=seed, test_size=test_size)
+
+        else:
+            X_train, X_val, X_test, y_train, y_val, y_test = load_preprocessed_train_val_test_splits(
+                data_path=config.PATHS.WINDOW_FEATURES,
+                exclude_sess_type=session_type_mapping[exclude_by],
+                num_targets=num_targets, seed=seed, test_size=test_size,
+                split_by_subjects=split_by_subjects)
 
     # need to have extra validation set so that we have the indices of the subjects,
     # then put together with training set
-    split_idx = np.concatenate([np.ones(len(X_val)), np.repeat(-1, len(X_test))])
+    split_idx = np.concatenate([np.ones(len(X_val)), np.repeat(-1, len(X_train))])
     X_train = np.concatenate([X_val, X_train])
     y_train = np.concatenate([y_val, y_train])
+    del X_val, y_val
     print(f"X_train shape: {X_train.shape}, y_train shape: {y_train.shape}")
     print(f"X_test shape: {X_test.shape}, y_test shape: {y_test.shape}")
     cv = PredefinedSplit(test_fold=split_idx)
@@ -299,7 +366,7 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
 
     # train model on entire dataset
     new_pipe: Pipeline = pipe.set_params(**search.best_params_)  # noqa
-    new_pipe.fit(X=X_train, y=y_train)
+    new_pipe.fit(X=X_train, y=y_train, **fit_params)
 
     # log metrics on test and train set
     train_score = new_pipe.score(X_train, y_train)

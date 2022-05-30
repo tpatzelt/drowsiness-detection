@@ -44,7 +44,7 @@ def build_dense_model(input_shape, num_hidden: int = 64, optimizer: str = "adam"
     model.add(keras.layers.InputLayer(input_shape=input_shape[1:]))
     model.add(keras.layers.Flatten())
     model.add(keras.layers.Dense(num_hidden, activation='relu'))
-    model.add(keras.layers.Dense(1, activation='sigmoid'))
+    model.add(keras.layers.Dense(1, activation='softmax'))
     # Compile model
     model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
     # model.summary()

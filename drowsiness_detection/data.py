@@ -1,8 +1,8 @@
 import json
-import pickle
 from pathlib import Path
 from random import choice
 
+import dill as pickle
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -183,7 +183,8 @@ def get_feature_data(data_path: Path = config.PATHS.WINDOW_FEATURES):
 
 def preprocess_feature_data(feature_data: np.ndarray, exclude_sess_type: int, num_targets: int):
     """Preprocessing the feature data includes removing NaNs,
-    binarize kss scores and split into features and targets."""
+    binarize kss scores and split into features and targets.
+    returns subject_data which is an array [:, sess id, subject id]"""
     # col -3 is targets, -2 is sess type and -1 is subject id
     feature_data = np.nan_to_num(feature_data)
     targets = feature_data[:, -3]
@@ -216,6 +217,29 @@ def preprocess_feature_data(feature_data: np.ndarray, exclude_sess_type: int, nu
     return X, y, subject_data
 
 
+def discretize_labels_by_threshold(targets, num_targets: int):
+    if num_targets == 2:
+        KSS_THRESHOLD = 7
+        targets = binarize(targets, threshold=KSS_THRESHOLD)
+    elif num_targets == 3:
+        ALERT = 6
+        NEUTRAL = 8
+        SLEEPY = 10
+        targets = np.digitize(targets, bins=[ALERT, NEUTRAL, SLEEPY])
+    elif num_targets == 5:
+        first = 3
+        second = 5
+        third = 7
+        forth = 9
+        fifth = 10
+        targets = np.digitize(targets, bins=[first, second, third, forth, fifth])
+    elif num_targets == 9:
+        targets = np.digitize(targets, bins=range(1, 10))
+    else:
+        raise ValueError(f"num targets {num_targets} not supported.")
+    return targets
+
+
 def get_data_for_nn(data_path: Path = config.PATHS.WINDOW_DATA):
     """Loads all files under data_path, adds the session type, subject id and kss score as new columns. """
     for feature_file in data_path.iterdir():
@@ -230,28 +254,32 @@ def get_data_for_nn(data_path: Path = config.PATHS.WINDOW_DATA):
         yield features, targets, sess_types, subject_ids
 
 
-def preprocess_data_for_nn(data_generator, exclude_sess_type: str, num_targets: int):
+def preprocess_data_for_nn(data_generator, exclude_sess_type: int, num_targets: int):
     for feature_data, targets, session_types, subject_ids in data_generator:
+        targets = discretize_labels_by_threshold(targets=targets, num_targets=num_targets)
         feature_data = np.nan_to_num(feature_data)
         # remove one session type
-        session_mask = session_types != session_type_mapping[exclude_sess_type]
+        session_mask = session_types != exclude_sess_type
         feature_data = feature_data[session_mask, :, :]
         targets = targets[session_mask]
+        session_types = session_types[session_mask]
+        subject_ids = subject_ids[session_mask]
         # print(f"{feature_data.shape} vs {targets.shape}")
         if feature_data.shape[0] != targets.shape[0]:
             raise ValueError(f"{feature_data.shape} vs {targets.shape}")
         if feature_data.size == 0:
             continue
-        yield feature_data, targets
+        yield feature_data, targets, np.c_[session_types, subject_ids]
 
 
 # %%
 def merge_nn_data(data_generator):
     """ Aggregates the data from data_generator into one array."""
-
     values_per_block = config.PATHS.seconds * config.PATHS.frequency
     Xs, ys = [], []
-    for X, y in data_generator:
+    subject_data_s = []
+    i = 0
+    for X, y, subject_data in data_generator:
         if X.shape[1] < values_per_block:
             num_missing_rows = values_per_block - X.shape[1]
             missing_rows_X = np.stack([X[:, -1, :]] * num_missing_rows, axis=1)
@@ -260,16 +288,17 @@ def merge_nn_data(data_generator):
             X = X[:, :values_per_block, :]
         Xs.append(X)
         ys.append(y)
-    return np.concatenate(Xs), np.concatenate(ys)
+        subject_data_s.append(subject_data)
+        if i == 10:
+            break
+    return np.concatenate(Xs), np.concatenate(ys), np.concatenate(subject_data_s)
 
 
-def load_nn_data(exclude_by: str = "a", data_path: Path = config.PATHS.WINDOW_DATA,
+def load_nn_data(exclude_by: int = 1, data_path: Path = config.PATHS.WINDOW_DATA,
                  num_targets: int = 2):
     data_gen = get_data_for_nn(data_path=data_path)
     data_gen = preprocess_data_for_nn(data_generator=data_gen, exclude_sess_type=exclude_by,
                                       num_targets=num_targets)
-    for _ in range(50):
-        next(data_gen)
     return merge_nn_data(data_generator=data_gen)
 
 
@@ -401,6 +430,23 @@ def load_preprocessed_train_val_test_splits(data_path, exclude_sess_type, num_ta
                                                                         subject_data=train_subject_info)
     return X_train, X_val, X_test, y_train, y_val, y_test
 
+
+def load_preprocessed_train_val_test_splits_nn(data_path, exclude_sess_type, num_targets,
+                                               seed, test_size):
+    np.random.seed(seed)
+    random.seed(seed)
+    X, y, subject_data = load_nn_data(data_path=data_path, exclude_by=exclude_sess_type,
+                                      num_targets=num_targets)
+    X_train, X_test, y_train, y_test, _, (
+        train_subject_info, test_subject_info) = train_test_split_by_subjects(X, y,
+                                                                              num_targets=num_targets,
+                                                                              test_size=test_size,
+                                                                              subject_data=subject_data)
+    X_train, X_val, y_train, y_val, _, _ = train_test_split_by_subjects(
+        X_train, y_train, num_targets=num_targets,
+        test_size=test_size / (1 - test_size), subject_data=train_subject_info)
+
+    return X_train, X_val, X_test, y_train, y_val, y_test
 
 if __name__ == '__main__':
     import random
