@@ -1,7 +1,6 @@
 import json
 from pathlib import Path
 from random import choice
-import random
 
 import dill as pickle
 import numpy as np
@@ -292,6 +291,7 @@ def merge_nn_data(data_generator):
         subject_data_s.append(subject_data)
         # if i == 10:
         #     break
+        # i += 1
     return np.concatenate(Xs), np.concatenate(ys), np.concatenate(subject_data_s)
 
 
