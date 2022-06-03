@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from random import choice
+import random
 
 import dill as pickle
 import numpy as np
@@ -278,7 +279,7 @@ def merge_nn_data(data_generator):
     values_per_block = config.PATHS.seconds * config.PATHS.frequency
     Xs, ys = [], []
     subject_data_s = []
-    # i = 0
+    i = 0
     for X, y, subject_data in data_generator:
         if X.shape[1] < values_per_block:
             num_missing_rows = values_per_block - X.shape[1]
@@ -289,9 +290,9 @@ def merge_nn_data(data_generator):
         Xs.append(X)
         ys.append(y)
         subject_data_s.append(subject_data)
-        # if i == 10:
-        #     break
-        # i += 1
+        if i == 10:
+            break
+        i += 1
     return np.concatenate(Xs), np.concatenate(ys), np.concatenate(subject_data_s)
 
 
