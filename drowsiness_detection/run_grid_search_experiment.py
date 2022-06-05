@@ -8,6 +8,7 @@ from sklearn.experimental import enable_halving_search_cv  # noqa
 from sklearn.model_selection import HalvingRandomSearchCV, RandomizedSearchCV, train_test_split, \
     GridSearchCV, PredefinedSplit
 import numpy as np
+from typing import Tuple
 from sklearn.pipeline import Pipeline
 from keras.wrappers.scikit_learn import KerasClassifier
 import dill as pickle
@@ -63,6 +64,7 @@ def base():
     use_dummy_data = False
     split_by_subjects = True
     nn_experiment = False
+    feature_col_indices = None
 
 
 @ex.named_config
@@ -173,15 +175,18 @@ def dense_nn():
     grid_search_params = {
         "scoring": "accuracy",
         "return_train_score": True,
-        "n_iter": 1
+        "n_iter": 5,
+        "n_jobs": 1,
     }
-    fit_params = {"classifier__epochs": 1, "classifier__batch_size": 30}
-    model_init_params = {"input_shape": (20, 300, 23)}
+    fit_params = {"classifier__epochs": 2, "classifier__batch_size": 10}
+    model_init_params = {"input_shape": (20, 300, 7)}
     scaler_name = "3D-standard"
     hyperparameter_specs = [
         dict(name="UniformIntegerHyperparameter",
              kwargs=dict(name="classifier__num_hidden", lower=32, upper=2024, log=False)),
+            # kwargs = dict(name="classifier__num_hidden", lower=2, upper=3, log=False)),
     ]
+    feature_col_indices = (5,8,9,14,15,16,19)
 
 
 @ex.named_config
@@ -192,19 +197,23 @@ def cnn():
     grid_search_params = {
         "scoring": "accuracy",
         "return_train_score": True,
-        "n_iter": 1
+        "n_iter": 5,
+        "n_jobs": 1,
     }
-    fit_params = {"classifier__epochs": 1, "classifier__batch_size": 10}
-    model_init_params = {"input_shape": (20, 300, 23)}
+    fit_params = {"classifier__epochs": 2, "classifier__batch_size": 10}
+    model_init_params = {"input_shape": (20, 300,7)}
     scaler_name = "3D-standard"
     hyperparameter_specs = [
         dict(name="UniformIntegerHyperparameter",
              kwargs=dict(name="classifier__num_filters", lower=16, upper=128, log=False)),
         dict(name="CategoricalHyperparameter",
-             kwargs=dict(name="classifier__kernel_size", choices=[(2, 1), (3, 1), (5, 1)])),
+             kwargs=dict(name="classifier__kernel_size", choices=['2,1', '3,1', '5,1']),
+             parse_from_str=True),
         dict(name="CategoricalHyperparameter",
-             kwargs=dict(name="classifier__stride", choices=[(2, 1), (3, 1), (5, 1)])),
+             kwargs=dict(name="classifier__stride", choices=['2,1', '3,1', '5,1']),
+             parse_from_str=True),
     ]
+    feature_col_indices = (5,8,9,14,15,16,19)
 
 
 @ex.named_config
@@ -215,17 +224,19 @@ def lstm():
     grid_search_params = {
         "scoring": "accuracy",
         "return_train_score": True,
-        "n_iter": 20
+        "n_iter": 5,
+        "n_jobs": 1,
     }
-    fit_params = {"classifier__epochs": 30, "classifier__batch_size": 10}
-    model_init_params = {"input_shape": (20, 300, 23)}
+    fit_params = {"classifier__epochs": 1, "classifier__batch_size": 10}
+    model_init_params = {"input_shape": (20, 300, 7)}
     scaler_name = "3D-standard"
     hyperparameter_specs = [
         dict(name="UniformIntegerHyperparameter",
-             kwargs=dict(name="classifier__lstm1_units", lower=3, upper=4, log=False)),
+             kwargs=dict(name="classifier__lstm1_units", lower=8, upper=128, log=False)),
         dict(name="UniformIntegerHyperparameter",
-             kwargs=dict(name="classifier__lstm2_units", lower=3, upper=4, log=False)),
+             kwargs=dict(name="classifier__lstm2_units", lower=8, upper=128, log=False)),
     ]
+    feature_col_indices = (5,8,9,14,15,16,19)
 
 
 def parse_model_name(model_name: str, model_init_params={}):
@@ -244,19 +255,18 @@ def parse_model_name(model_name: str, model_init_params={}):
     elif model_name == "DenseNN":
         def model_fn(num_hidden):
             return build_dense_model(num_hidden=num_hidden, **model_init_params)
-
         model = KerasClassifier(build_fn=model_fn)
     elif model_name == "CNN":
         def model_fn(kernel_size, stride, num_filters):
+            kernel_size = tuple([int(val) for val in kernel_size.split(',')])
+            stride = tuple([int(val) for val in stride.split(',')])
             return build_cnn_model(kernel_size=kernel_size, stride=stride,
-                                   num_filters=num_filters ** model_init_params)
-
+                                   num_filters=num_filters, **model_init_params)
         model = KerasClassifier(build_fn=model_fn)
     elif model_name == "LSTM":
         def model_fn(lstm1_units, lstm2_units):
             return build_lstm_model(lstm1_units=lstm1_units, lstm2_units=lstm2_units,
                                     **model_init_params)
-
         model = KerasClassifier(build_fn=model_fn)
     else:
         raise ValueError
@@ -291,7 +301,7 @@ def parse_scaler_name(scaler_name: str):
 def run(recording_frequency: int, window_in_sec: int, model_selection_name: str, scaler_name: str,
         grid_search_params: dict, model_name: str, exclude_by: str, hyperparameter_specs: dict,
         seed, test_size: float, n_splits: int, num_targets: int, use_dummy_data: bool,
-        split_by_subjects: bool, fit_params: dict, model_init_params: dict, nn_experiment: bool):
+        split_by_subjects: bool, fit_params: dict, model_init_params: dict, nn_experiment: bool, feature_col_indices: Tuple):
     # set up global paths and cache dir for pipeline
     config.set_paths(frequency=recording_frequency, seconds=window_in_sec)
 
@@ -303,7 +313,8 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     # load data
     if use_dummy_data:
         num_samples = 200
-        X = np.random.random(num_samples * 300 * 23).reshape((num_samples, 300, 23))
+        num_feature_cols = len(feature_col_indices)
+        X = np.random.random(num_samples * 300 * num_feature_cols).reshape((num_samples, 300, num_feature_cols))
         y = np.concatenate((np.zeros((num_samples // 2)), np.ones((num_samples // 2))))
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
                                                             random_state=seed)
@@ -315,7 +326,7 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
             X_train, X_val, X_test, y_train, y_val, y_test = load_preprocessed_train_val_test_splits_nn(
                 data_path=config.PATHS.WINDOW_DATA,
                 exclude_sess_type=session_type_mapping[exclude_by],
-                num_targets=num_targets, seed=seed, test_size=test_size)
+                num_targets=num_targets, seed=seed, test_size=test_size, feature_col_indices=feature_col_indices)
 
         else:
             X_train, X_val, X_test, y_train, y_val, y_test = load_preprocessed_train_val_test_splits(
@@ -332,6 +343,7 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     del X_val, y_val
     print(f"X_train shape: {X_train.shape}, y_train shape: {y_train.shape}")
     print(f"X_test shape: {X_test.shape}, y_test shape: {y_test.shape}")
+
     cv = PredefinedSplit(test_fold=split_idx)
 
     pipe = Pipeline([("scaler", scaler), ("classifier", model)])
