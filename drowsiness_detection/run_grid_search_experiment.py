@@ -88,25 +88,22 @@ def dummy_classification():
 
 @ex.named_config
 def dummy_tf_classification():
+    nn_experiment = True
     model_selection_name = "random"
     scaler_name = "3D-standard"
     grid_search_params = {
         "scoring": "accuracy",
-        "n_iter": 2
+        "n_iter": 2,
+        "return_train_score": True,
     }
+    model_init_params = {"input_shape": (20, 300, 23)}
     hyperparameter_specs = [
         dict(name="CategoricalHyperparameter",
              kwargs=dict(name="classifier__activation",
                          choices=["softmax", "relu"])),
         dict(name="CategoricalHyperparameter",
-             kwargs=dict(name="classifier__batch_size",
-                         choices=[10, 20])),
-        dict(name="CategoricalHyperparameter",
              kwargs=dict(name="classifier__optimizer",
                          choices=["adam"])),
-        dict(name="CategoricalHyperparameter",
-             kwargs=dict(name="classifier__input_shape",
-                         choices=["1,300,23"]))
     ]
     model_name = "DummyTFClassifier"
 
@@ -176,9 +173,9 @@ def dense_nn():
     grid_search_params = {
         "scoring": "accuracy",
         "return_train_score": True,
-        "n_iter": 20
+        "n_iter": 1
     }
-    fit_params = {"classifier__epochs": 30, "classifier__batch_size": 10}
+    fit_params = {"classifier__epochs": 1, "classifier__batch_size": 30}
     model_init_params = {"input_shape": (20, 300, 23)}
     scaler_name = "3D-standard"
     hyperparameter_specs = [
@@ -239,7 +236,11 @@ def parse_model_name(model_name: str, model_init_params={}):
     elif model_name == "DummyClassifier":
         model = DummyClassifier()
     elif model_name == "DummyTFClassifier":
-        model = KerasClassifier(build_fn=build_dummy_tf_classifier)
+        def model_fn(activation, optimizer):
+            return build_dummy_tf_classifier(activation=activation, optimizer=optimizer,
+                                             **model_init_params)
+
+        model = KerasClassifier(build_fn=model_fn)
     elif model_name == "DenseNN":
         def model_fn(num_hidden):
             return build_dense_model(num_hidden=num_hidden, **model_init_params)
@@ -374,6 +375,12 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
         result_path = Path(ex.observers[0].dir).joinpath("best_model")
         result_path.mkdir()
         new_pipe.named_steps["classifier"].model.save(result_path)
+        history_path = Path("history.pkl")
+        with open(history_path, "wb") as fp:
+            pickle.dump(file=fp, obj=new_pipe.named_steps["classifier"].model.history)
+        ex.add_artifact(history_path, name="history.pkl")
+        history_path.unlink()
+
     else:
         result_path = Path("best_model.pkl")
         with open(result_path, "wb") as fp:
