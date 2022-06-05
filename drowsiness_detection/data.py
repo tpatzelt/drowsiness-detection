@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from random import choice
 import random
-
+from typing import Tuple
 import dill as pickle
 import numpy as np
 import pandas as pd
@@ -255,7 +255,7 @@ def get_data_for_nn(data_path: Path = config.PATHS.WINDOW_DATA):
         yield features, targets, sess_types, subject_ids
 
 
-def preprocess_data_for_nn(data_generator, exclude_sess_type: int, num_targets: int):
+def preprocess_data_for_nn(data_generator, exclude_sess_type: int, num_targets: int, feature_col_indices: Tuple):
     for feature_data, targets, session_types, subject_ids in data_generator:
         targets = discretize_labels_by_threshold(targets=targets, num_targets=num_targets)
         feature_data = np.nan_to_num(feature_data)
@@ -266,11 +266,13 @@ def preprocess_data_for_nn(data_generator, exclude_sess_type: int, num_targets: 
         session_types = session_types[session_mask]
         subject_ids = subject_ids[session_mask]
         # print(f"{feature_data.shape} vs {targets.shape}")
+        # only use certain feature columns
+        feature_data = feature_data[:,:,feature_col_indices]
         if feature_data.shape[0] != targets.shape[0]:
             raise ValueError(f"{feature_data.shape} vs {targets.shape}")
         if feature_data.size == 0:
             continue
-        yield feature_data, targets, np.c_[session_types, subject_ids]
+        yield feature_data.astype(np.float32), targets.astype(int), np.c_[session_types, subject_ids]
 
 
 # %%
@@ -290,17 +292,17 @@ def merge_nn_data(data_generator):
         Xs.append(X)
         ys.append(y)
         subject_data_s.append(subject_data)
-        if i == 10:
+        if i == 30:
             break
-        i += 1
+        # i += 1
     return np.concatenate(Xs), np.concatenate(ys), np.concatenate(subject_data_s)
 
 
 def load_nn_data(exclude_by: int = 1, data_path: Path = config.PATHS.WINDOW_DATA,
-                 num_targets: int = 2):
+                 num_targets: int = 2, feature_col_indices: Tuple = (5,8,9,14,15,16,19)):
     data_gen = get_data_for_nn(data_path=data_path)
     data_gen = preprocess_data_for_nn(data_generator=data_gen, exclude_sess_type=exclude_by,
-                                      num_targets=num_targets)
+                                      num_targets=num_targets, feature_col_indices=feature_col_indices)
     return merge_nn_data(data_generator=data_gen)
 
 
@@ -434,11 +436,11 @@ def load_preprocessed_train_val_test_splits(data_path, exclude_sess_type, num_ta
 
 
 def load_preprocessed_train_val_test_splits_nn(data_path, exclude_sess_type, num_targets,
-                                               seed, test_size):
+                                               seed, test_size, feature_col_indices: Tuple):
     np.random.seed(seed)
     random.seed(seed)
     X, y, subject_data = load_nn_data(data_path=data_path, exclude_by=exclude_sess_type,
-                                      num_targets=num_targets)
+                                      num_targets=num_targets, feature_col_indices=feature_col_indices)
     X_train, X_test, y_train, y_test, _, (
         train_subject_info, test_subject_info) = train_test_split_by_subjects(X, y,
                                                                               num_targets=num_targets,
