@@ -17,8 +17,6 @@ class ThreeDStandardScaler(TransformerMixin):
 
 
 def build_dummy_tf_classifier(input_shape, activation: str = None, optimizer: str = "adam"):
-    if isinstance(input_shape, str):
-        input_shape = tuple([int(x) for x in input_shape.split(",")])
     """Build a non-trainable keras classifier."""
     input_layer = keras.layers.Input(input_shape[1:])
     flatten_layer = keras.layers.Flatten()(input_layer)
@@ -37,8 +35,6 @@ def build_dummy_tf_classifier(input_shape, activation: str = None, optimizer: st
 
 
 def build_dense_model(input_shape, num_hidden: int = 64, optimizer: str = "adam"):
-    if isinstance(input_shape, str):
-        input_shape = tuple([int(x) for x in input_shape.split(",")])
     # create model
     model = keras.Sequential()
     model.add(keras.layers.InputLayer(input_shape=input_shape[1:]))
