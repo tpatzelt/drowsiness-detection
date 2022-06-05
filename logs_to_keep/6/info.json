@@ -1,0 +1,14 @@
+{
+  "best_cv_test_accuracy": 0.6769411419345369,
+  "best_cv_train_accuracy": 0.9533127889060092,
+  "best_params": {
+    "classifier__class_weight": "balanced",
+    "classifier__criterion": "entropy",
+    "classifier__max_depth": 44,
+    "classifier__max_features": "sqrt",
+    "classifier__min_samples_split": 0.02266174383323893,
+    "classifier__n_estimators": 512
+  },
+  "test_accuracy": 0.6610169491525424,
+  "train_accuracy": 0.8437573110816502
+}

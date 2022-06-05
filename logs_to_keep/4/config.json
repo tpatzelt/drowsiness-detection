@@ -1,0 +1,79 @@
+{
+  "exclude_by": "a",
+  "grid_search_params": {
+    "error_score": 0,
+    "n_iter": 100,
+    "n_jobs": -1,
+    "refit": false,
+    "return_train_score": true,
+    "scoring": "accuracy",
+    "verbose": 1
+  },
+  "hyperparameter_specs": [
+    {
+      "kwargs": {
+        "choices": [
+          "entropy"
+        ],
+        "name": "classifier__criterion"
+      },
+      "name": "CategoricalHyperparameter"
+    },
+    {
+      "kwargs": {
+        "log": false,
+        "lower": 2,
+        "name": "classifier__max_depth",
+        "upper": 150
+      },
+      "name": "UniformIntegerHyperparameter"
+    },
+    {
+      "kwargs": {
+        "choices": [
+          "sqrt"
+        ],
+        "name": "classifier__max_features"
+      },
+      "name": "CategoricalHyperparameter"
+    },
+    {
+      "kwargs": {
+        "choices": [
+          512
+        ],
+        "name": "classifier__n_estimators"
+      },
+      "name": "CategoricalHyperparameter"
+    },
+    {
+      "kwargs": {
+        "choices": [
+          "balanced"
+        ],
+        "name": "classifier__class_weight"
+      },
+      "name": "CategoricalHyperparameter"
+    },
+    {
+      "kwargs": {
+        "log": false,
+        "lower": 0.015,
+        "name": "classifier__min_samples_split",
+        "upper": 0.04
+      },
+      "name": "UniformFloatHyperparameter"
+    }
+  ],
+  "model_name": "RandomForestClassifier",
+  "model_selection_name": "random",
+  "n_splits": 10,
+  "num_targets": 2,
+  "recording_frequency": 30,
+  "scaler_name": "standard",
+  "seed": 123,
+  "split_by_subjects": true,
+  "test_size": 0.2,
+  "use_dummy_data": false,
+  "window_in_sec": 10
+}
