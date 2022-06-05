@@ -43,7 +43,7 @@ def build_dense_model(input_shape, num_hidden: int = 64, optimizer: str = "adam"
     model.add(keras.layers.Dense(1, activation='softmax'))
     # Compile model
     model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
-    # model.summary()
+    print(model.summary())
     return model
 
 
@@ -55,7 +55,7 @@ def build_cnn_model(input_shape,
                     use_batch_norm=True,
                     lr=.001):
     input_layer = keras.layers.Input(input_shape[1:])
-    reshape_layer = keras.layers.Reshape(input_shape[1:] + (1,))(input_layer)
+    reshape_layer = keras.layers.Reshape(input_shape[1:] + [1,])(input_layer)
 
     conv1 = keras.layers.Conv2D(filters=num_filters, kernel_size=kernel_size, strides=stride,
                                 padding=padding)(reshape_layer)
@@ -88,7 +88,7 @@ def build_cnn_model(input_shape,
     # ]
     optimizer = keras.optimizers.Adam(learning_rate=lr)
     model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
-    model.summary()
+    print(model.summary())
     return model
 
 
@@ -109,4 +109,5 @@ def build_lstm_model(input_shape,
 
     optimizer = keras.optimizers.Adam(learning_rate=lr)
     model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
+    print(model.summary())
     return model
