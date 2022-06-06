@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from random import choice
 import random
-from typing import Tuple
+from typing import Tuple, Union
 import dill as pickle
 import numpy as np
 import pandas as pd
@@ -306,25 +306,25 @@ def load_nn_data(exclude_by: int = 1, data_path: Path = config.PATHS.WINDOW_DATA
     return merge_nn_data(data_generator=data_gen)
 
 
-def load_experiment_config(experiment_id: int):
-    with open(f"../../logs/{experiment_id}/config.json") as fp:
+def load_experiment_config(experiment_id: int, log_dir: str = "../../logs/"):
+    with open(f"{log_dir}{experiment_id}/config.json") as fp:
         return json.load(fp)
 
 
-def load_experiment_best_model(experiment_id: int):
-    with open(f"../../logs/{experiment_id}/best_model.pkl", "rb") as fp:
+def load_experiment_best_model(experiment_id: int, log_dir: str = "../../logs/"):
+    with open(f"{log_dir}{experiment_id}/best_model.pkl", "rb") as fp:
         return pickle.load(fp)
 
 
-def load_experiment_search_results(experiment_id: int):
-    with open(f"../../logs/{experiment_id}/search_result.pkl", "rb") as fp:
+def load_experiment_search_results(experiment_id: int, log_dir: str = "../../logs/"):
+    with open(f"{log_dir}{experiment_id}/search_result.pkl", "rb") as fp:
         return pickle.load(fp)
 
 
-def load_experiment_objects(experiment_id: int):
-    config = load_experiment_config(experiment_id)
-    best_model = load_experiment_best_model(experiment_id)
-    search_results = load_experiment_search_results(experiment_id)
+def load_experiment_objects(experiment_id: Union[str,int], log_dir: str = "../../logs/"):
+    config = load_experiment_config(experiment_id, log_dir=log_dir)
+    best_model = load_experiment_best_model(experiment_id, log_dir=log_dir)
+    search_results = load_experiment_search_results(experiment_id, log_dir=log_dir)
     return config, best_model, search_results
 
 
