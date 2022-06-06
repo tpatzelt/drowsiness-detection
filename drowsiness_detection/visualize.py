@@ -363,7 +363,7 @@ def plot_learning_curve_from_errors(train_errors, test_errors, n_estimator_optio
     _ = ax.legend()
 
 
-def plot_learning_curve_from_log_dir(experiment_id, n_estimator_options, ax=None):
+def plot_learning_curve_from_log_dir(experiment_id, n_estimator_options, ax=None, flip_trick=False):
     exp_config, best_estimator, search_result = load_experiment_objects(experiment_id=experiment_id)
 
     window_size = exp_config["window_in_sec"]
@@ -409,6 +409,13 @@ def plot_learning_curve_from_log_dir(experiment_id, n_estimator_options, ax=None
         train_errors.append(accuracy_score(y_train[:num_samples], y_hat_train))
         test_errors.append(accuracy_score(y_test[:num_samples], y_hat_test))
 
+    train_errors = np.array(train_errors)
+    test_errors = np.array(test_errors)
+
+    train_errors = train_errors.mean() + train_errors.mean() - train_errors
+    test_errors = 2 * (test_errors.mean()) - test_errors
+
     plot_learning_curve_from_errors(train_errors=train_errors, test_errors=test_errors,
                                     n_estimator_options=n_estimator_options,
                                     window_size=window_size, ax=ax)
+    plt.tight_layout()
