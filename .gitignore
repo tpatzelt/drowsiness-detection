@@ -1,6 +1,6 @@
 .idea/
 data/
-notebooks/.ipynb_checkpoints/
+*/.ipynb_checkpoints/
 logs/
 drowsiness_detection/__pycache__/
 foobar/
