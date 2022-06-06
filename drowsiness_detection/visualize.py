@@ -337,6 +337,12 @@ def plot_roc_curve_from_log_dir(experiment_id=21, plot_train_roc: bool = False, 
         test_size=exp_config["test_size"],
         split_by_subjects=exp_config["split_by_subjects"])
 
+    print(f"ID {experiment_id}")
+    y_pred = best_estimator.predict(X_test)
+    print(f"test accuracy = {np.mean(y_pred == y_test)}")
+    y_pred = best_estimator.predict(X_train)
+    print(f"train accuracy = {np.mean(y_pred == y_train)}")
+    print()
     RocCurveDisplay.from_estimator(estimator=best_estimator, X=X_test, y=y_test,
                                    name=f"RF-{window_size}s" + ("(test)" if plot_train_roc else ""),
                                    ax=ax, pos_label=pos_label)
