@@ -1,0 +1,4 @@
+Starting experiment on 20 sec data with 2 targets.
+X_train shape: (27539, 785), y_train shape: (27539,)
+X_test shape: (6973, 785), y_test shape: (6973,)
+Fitting 1 folds for each of 300 candidates, totalling 300 fits
