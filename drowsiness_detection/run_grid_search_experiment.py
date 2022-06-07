@@ -148,7 +148,7 @@ def random_forest():
              # kwargs=dict(name="classifier__criterion", choices=["gini", "entropy"])),
              kwargs=dict(name="classifier__criterion", choices=["entropy"])),
         dict(name="UniformIntegerHyperparameter",
-             kwargs=dict(name="classifier__max_depth", lower=2, upper=150, log=False)),
+             kwargs=dict(name="classifier__max_depth", lower=2, upper=60, log=False)),
         # dict(name="CategoricalHyperparameter",
         #      kwargs=dict(name="classifier__max_depth", choices=[max_depth])),
         dict(name="CategoricalHyperparameter",
@@ -163,7 +163,7 @@ def random_forest():
         # dict(name="CategoricalHyperparameter",
         #      kwargs=dict(name="classifier__min_samples_split", choices=[0.015, 0.03]))
         dict(name="UniformFloatHyperparameter",
-             kwargs=dict(name="classifier__min_samples_split", lower=0.015, upper=0.04, log=False)),
+             kwargs=dict(name="classifier__min_samples_split", lower=0.005, upper=0.06, log=False)),
     ]
 
 
