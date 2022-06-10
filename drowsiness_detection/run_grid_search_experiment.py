@@ -200,18 +200,20 @@ def cnn():
         "n_iter": 5,
         "n_jobs": 1,
     }
-    fit_params = {"classifier__epochs": 2, "classifier__batch_size": 10}
-    model_init_params = {"input_shape": (20, 300,7)}
+    fit_params = {"classifier__epochs": 50, "classifier__batch_size": 10}
+    model_init_params = {"input_shape": (20, 300, 7)}
     scaler_name = "3D-standard"
     hyperparameter_specs = [
         dict(name="UniformIntegerHyperparameter",
              kwargs=dict(name="classifier__num_filters", lower=16, upper=128, log=False)),
         dict(name="CategoricalHyperparameter",
-             kwargs=dict(name="classifier__kernel_size", choices=['2,1', '3,1', '5,1']),
-             parse_from_str=True),
+             kwargs=dict(name="classifier__kernel_size", choices=[3, 5])),
         dict(name="CategoricalHyperparameter",
-             kwargs=dict(name="classifier__stride", choices=['2,1', '3,1', '5,1']),
-             parse_from_str=True),
+             kwargs=dict(name="classifier__stride", choices=[3, 5])),
+        dict(name="CategoricalHyperparamter",
+             kwargs=dict(name="classifier__pooling", choices=["average", "max"])),
+        dict(name="UniformIntegerHyperparameter",
+             kwargs=dict(name="classifier__num_conv_layers", lower=1, upper=4, log=False)),
     ]
     feature_col_indices = (5,8,9,14,15,16,19)
 

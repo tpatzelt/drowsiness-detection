@@ -48,49 +48,39 @@ def build_dense_model(input_shape, num_hidden: int = 64, optimizer: str = "adam"
 
 
 def build_cnn_model(input_shape,
-                    kernel_size=(5, 1),
-                    stride=(3, 1),
+                    kernel_size=5,
+                    stride=1,
                     num_filters=32,
-                    padding="valid",
+                    num_conv_layers=2,
+                    padding="same",
                     use_batch_norm=True,
-                    lr=.001):
+                    lr=0.1,
+                    pooling="average"):
     input_layer = keras.layers.Input(input_shape[1:])
-    reshape_layer = keras.layers.Reshape(input_shape[1:] + [1,])(input_layer)
+    prev_layer = input_layer
+    for _ in range(num_conv_layers):
+        conv_layer = keras.layers.Conv1D(filters=num_filters, kernel_size=kernel_size,
+                                         strides=stride,
+                                         padding=padding)(prev_layer)
+        if use_batch_norm:
+            conv_layer = keras.layers.BatchNormalization()(conv_layer)
+        conv_layer = keras.layers.ReLU()(conv_layer)
+        prev_layer = conv_layer
 
-    conv1 = keras.layers.Conv2D(filters=num_filters, kernel_size=kernel_size, strides=stride,
-                                padding=padding)(reshape_layer)
-    if use_batch_norm:
-        conv1 = keras.layers.BatchNormalization()(conv1)
-    conv1 = keras.layers.ReLU()(conv1)
+    if pooling == "average":
+        pool_layer = keras.layers.GlobalAveragePooling1D()(prev_layer)
+    elif pooling == "max":
+        pool_layer = keras.layers.GlobalMaxPool1D()(prev_layer)
+    else:
+        pool_layer = prev_layer
 
-    conv2 = keras.layers.Conv2D(filters=num_filters, kernel_size=kernel_size, padding=padding)(
-        conv1)
-    if use_batch_norm:
-        conv2 = keras.layers.BatchNormalization()(conv2)
-    conv2 = keras.layers.ReLU()(conv2)
+    output_layer = keras.layers.Dense(1, activation="sigmoid")(pool_layer)
 
-    conv3 = keras.layers.Conv2D(filters=num_filters, kernel_size=kernel_size, padding=padding)(
-        conv2)
-    if use_batch_norm:
-        conv3 = keras.layers.BatchNormalization()(conv3)
-    conv3 = keras.layers.ReLU()(conv3)
-
-    gap = keras.layers.GlobalAveragePooling2D()(conv3)
-
-    output_layer = keras.layers.Dense(1, activation="sigmoid")(gap)
     model = keras.models.Model(inputs=input_layer, outputs=output_layer)
-    # Compile model
-    # callbacks = [
-    # keras.callbacks.ReduceLROnPlateau(
-    #     monitor="val_loss", factor=0.5, patience=20, min_lr=0.0001
-    # ),
-    # keras.callbacks.EarlyStopping(monitor="val_loss", patience=50, verbose=1),
-    # ]
     optimizer = keras.optimizers.Adam(learning_rate=lr)
     model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
     print(model.summary())
     return model
-
 
 def build_lstm_model(input_shape,
                      lstm1_units=128,
