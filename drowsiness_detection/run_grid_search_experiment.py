@@ -200,7 +200,7 @@ def cnn():
         "n_iter": 5,
         "n_jobs": 1,
     }
-    fit_params = {"classifier__epochs": 50, "classifier__batch_size": 10}
+    fit_params = {"classifier__epochs": 50, "classifier__batch_size": 20}
     model_init_params = {"input_shape": (20, 300, 7)}
     scaler_name = "3D-standard"
     hyperparameter_specs = [
