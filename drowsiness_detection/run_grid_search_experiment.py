@@ -165,7 +165,7 @@ def random_forest():
         dict(name="UniformFloatHyperparameter",
              kwargs=dict(name="classifier__min_samples_split", lower=0.005, upper=0.06, log=False)),
     ]
-
+    model_init_params = {}
 
 @ex.named_config
 def dense_nn():
