@@ -1,9 +1,0 @@
-{
-  "best_cv_test_accuracy": 0.33845936794582393,
-  "best_cv_train_accuracy": 0.42542413381123056,
-  "best_params": {
-    "classifier__num_hidden": 778
-  },
-  "test_accuracy": 0.40081772208213806,
-  "train_accuracy": 0.4034198522567749
-}

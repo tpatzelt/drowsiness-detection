@@ -11,7 +11,7 @@ with open('./log_summary.csv', 'w', newline='') as csvfile:
 
     writer.writeheader()
     e_id = 1
-    log_dir = '../logs/'
+    log_dir = '../logs_to_keep/'
     for log_dir_single in sorted(Path(log_dir).iterdir(),
                                  key=lambda x: int(x.name) if len(str(x)) < 4 else 0):
         if not log_dir_single.is_dir() or log_dir_single.name == '_sources':
