@@ -4,7 +4,7 @@ from pathlib import Path
 
 from drowsiness_detection.data import load_experiment_objects
 
-with open('./log_summary.csv', 'w', newline='') as csvfile:
+with open('../logs/log_summary.csv', 'w', newline='') as csvfile:
     fieldnames = ['id', 'model_name', 'window_in_sec', 'description', 'seed', 'test_size',
                   'model_parameter', 'train_acc', 'test_acc', 'cv_train_acc', 'cv_test_acc']
     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -15,11 +15,11 @@ with open('./log_summary.csv', 'w', newline='') as csvfile:
     for log_dir_single in sorted(Path(log_dir).iterdir(),
                                  key=lambda x: int(x.name) if len(str(x)) < 4 else 0):
         if not log_dir_single.is_dir() or log_dir_single.name == '_sources':
-            print("skipping: ", log_dir_single)
             continue
         e_id = log_dir_single.name
         try:
-            config, best_model, search_results = load_experiment_objects(experiment_id=e_id, log_dir=log_dir)
+            config, best_model, search_results = load_experiment_objects(experiment_id=e_id,
+                                                                         log_dir=log_dir)
         except FileNotFoundError:
             continue
         model_name = config['model_name']
