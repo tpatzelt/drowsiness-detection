@@ -55,7 +55,8 @@ def build_cnn_model(input_shape,
                     padding="same",
                     use_batch_norm=True,
                     lr=0.1,
-                    pooling="average"):
+                    pooling="average",
+                    dropout_rate=.2):
     input_layer = keras.layers.Input(input_shape[1:])
     prev_layer = input_layer
     for _ in range(num_conv_layers):
@@ -74,7 +75,9 @@ def build_cnn_model(input_shape,
     else:
         pool_layer = prev_layer
 
-    output_layer = keras.layers.Dense(1, activation="sigmoid")(pool_layer)
+    dense_layer = keras.layers.Dense(32, activation='relu')(pool_layer)
+    dropout_layer = keras.layers.Dropout(dropout_rate)(dense_layer)
+    output_layer = keras.layers.Dense(1, activation="sigmoid")(dropout_layer)
 
     model = keras.models.Model(inputs=input_layer, outputs=output_layer)
     optimizer = keras.optimizers.Adam(learning_rate=lr)

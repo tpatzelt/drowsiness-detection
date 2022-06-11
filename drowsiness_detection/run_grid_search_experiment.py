@@ -184,9 +184,9 @@ def dense_nn():
     hyperparameter_specs = [
         dict(name="UniformIntegerHyperparameter",
              kwargs=dict(name="classifier__num_hidden", lower=32, upper=2024, log=False)),
-            # kwargs = dict(name="classifier__num_hidden", lower=2, upper=3, log=False)),
+        # kwargs = dict(name="classifier__num_hidden", lower=2, upper=3, log=False)),
     ]
-    feature_col_indices = (5,8,9,14,15,16,19)
+    feature_col_indices = (5, 8, 9, 14, 15, 16, 19)
 
 
 @ex.named_config
@@ -197,11 +197,11 @@ def cnn():
     grid_search_params = {
         "scoring": "accuracy",
         "return_train_score": True,
-        "n_iter": 5,
+        "n_iter": 30,
         "n_jobs": 1,
     }
-    fit_params = {"classifier__epochs": 50, "classifier__batch_size": 20}
-    model_init_params = {"input_shape": (20, 300, 7)}
+    fit_params = {"classifier__epochs": 25, "classifier__batch_size": 20, 'classifier__verbose': 0}
+    model_init_params = {"input_shape": (20, 1800, 7)}
     scaler_name = "3D-standard"
     hyperparameter_specs = [
         dict(name="UniformIntegerHyperparameter",
@@ -210,12 +210,14 @@ def cnn():
              kwargs=dict(name="classifier__kernel_size", choices=[3, 5])),
         dict(name="CategoricalHyperparameter",
              kwargs=dict(name="classifier__stride", choices=[3, 5])),
-        dict(name="CategoricalHyperparamter",
+        dict(name="CategoricalHyperparameter",
              kwargs=dict(name="classifier__pooling", choices=["average", "max"])),
         dict(name="UniformIntegerHyperparameter",
              kwargs=dict(name="classifier__num_conv_layers", lower=1, upper=4, log=False)),
+        dict(name="UniformFloatHyperparameter",
+             kwargs=dict(name="classifier__dropout_rate", lower=0, upper=.5, log=False)),
     ]
-    feature_col_indices = (5,8,9,14,15,16,19)
+    feature_col_indices = (5, 8, 9, 14, 15, 16, 19)
 
 
 @ex.named_config
@@ -226,10 +228,10 @@ def lstm():
     grid_search_params = {
         "scoring": "accuracy",
         "return_train_score": True,
-        "n_iter": 5,
+        "n_iter": 10,
         "n_jobs": 1,
     }
-    fit_params = {"classifier__epochs": 1, "classifier__batch_size": 10}
+    fit_params = {"classifier__epochs": 50, "classifier__batch_size": 20, 'verbose': 0}
     model_init_params = {"input_shape": (20, 300, 7)}
     scaler_name = "3D-standard"
     hyperparameter_specs = [
@@ -238,7 +240,7 @@ def lstm():
         dict(name="UniformIntegerHyperparameter",
              kwargs=dict(name="classifier__lstm2_units", lower=8, upper=128, log=False)),
     ]
-    feature_col_indices = (5,8,9,14,15,16,19)
+    feature_col_indices = (5, 8, 9, 14, 15, 16, 19)
 
 
 def parse_model_name(model_name: str, model_init_params={}):
@@ -257,18 +259,21 @@ def parse_model_name(model_name: str, model_init_params={}):
     elif model_name == "DenseNN":
         def model_fn(num_hidden):
             return build_dense_model(num_hidden=num_hidden, **model_init_params)
+
         model = KerasClassifier(build_fn=model_fn)
     elif model_name == "CNN":
-        def model_fn(kernel_size, stride, num_filters):
-            kernel_size = tuple([int(val) for val in kernel_size.split(',')])
-            stride = tuple([int(val) for val in stride.split(',')])
+        def model_fn(kernel_size, stride, num_filters, num_conv_layers, pooling, dropout_rate):
             return build_cnn_model(kernel_size=kernel_size, stride=stride,
-                                   num_filters=num_filters, **model_init_params)
+                                   num_filters=num_filters, num_conv_layers=num_conv_layers,
+                                   pooling=pooling, dropout_rate=dropout_rate,
+                                    **model_init_params)
+
         model = KerasClassifier(build_fn=model_fn)
     elif model_name == "LSTM":
         def model_fn(lstm1_units, lstm2_units):
             return build_lstm_model(lstm1_units=lstm1_units, lstm2_units=lstm2_units,
                                     **model_init_params)
+
         model = KerasClassifier(build_fn=model_fn)
     else:
         raise ValueError
@@ -303,7 +308,8 @@ def parse_scaler_name(scaler_name: str):
 def run(recording_frequency: int, window_in_sec: int, model_selection_name: str, scaler_name: str,
         grid_search_params: dict, model_name: str, exclude_by: str, hyperparameter_specs: dict,
         seed, test_size: float, n_splits: int, num_targets: int, use_dummy_data: bool,
-        split_by_subjects: bool, fit_params: dict, model_init_params: dict, nn_experiment: bool, feature_col_indices: Tuple):
+        split_by_subjects: bool, fit_params: dict, model_init_params: dict, nn_experiment: bool,
+        feature_col_indices: Tuple):
     # set up global paths and cache dir for pipeline
     config.set_paths(frequency=recording_frequency, seconds=window_in_sec)
 
@@ -316,7 +322,8 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     if use_dummy_data:
         num_samples = 200
         num_feature_cols = len(feature_col_indices)
-        X = np.random.random(num_samples * 300 * num_feature_cols).reshape((num_samples, 300, num_feature_cols))
+        X = np.random.random(num_samples * 300 * num_feature_cols).reshape(
+            (num_samples, 300, num_feature_cols))
         y = np.concatenate((np.zeros((num_samples // 2)), np.ones((num_samples // 2))))
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
                                                             random_state=seed)
@@ -328,7 +335,8 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
             X_train, X_val, X_test, y_train, y_val, y_test = load_preprocessed_train_val_test_splits_nn(
                 data_path=config.PATHS.WINDOW_DATA,
                 exclude_sess_type=session_type_mapping[exclude_by],
-                num_targets=num_targets, seed=seed, test_size=test_size, feature_col_indices=feature_col_indices)
+                num_targets=num_targets, seed=seed, test_size=test_size,
+                feature_col_indices=feature_col_indices)
 
         else:
             X_train, X_val, X_test, y_train, y_val, y_test = load_preprocessed_train_val_test_splits(
@@ -391,7 +399,7 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
         new_pipe.named_steps["classifier"].model.save(result_path)
         history_path = Path("history.pkl")
         with open(history_path, "wb") as fp:
-            pickle.dump(file=fp, obj=new_pipe.named_steps["classifier"].model.history)
+            pickle.dump(file=fp, obj=new_pipe.named_steps["classifier"].model.history.history)
         ex.add_artifact(history_path, name="history.pkl")
         history_path.unlink()
 
