@@ -199,7 +199,7 @@ def cnn():
     grid_search_params = {
         "scoring": "accuracy",
         "return_train_score": True,
-        "n_iter": 30,
+        "n_iter": 100,
         "n_jobs": 1,
     }
     fit_params = {"classifier__epochs": 25, "classifier__batch_size": 20, 'classifier__verbose': 0}
@@ -215,9 +215,9 @@ def cnn():
         dict(name="CategoricalHyperparameter",
              kwargs=dict(name="classifier__pooling", choices=["average", "max"])),
         dict(name="UniformIntegerHyperparameter",
-             kwargs=dict(name="classifier__num_conv_layers", lower=1, upper=4, log=False)),
+             kwargs=dict(name="classifier__num_conv_layers", lower=1, upper=3, log=False)),
         dict(name="UniformFloatHyperparameter",
-             kwargs=dict(name="classifier__dropout_rate", lower=0, upper=.5, log=False)),
+             kwargs=dict(name="classifier__dropout_rate", lower=0.2, upper=.6, log=False)),
     ]
     feature_col_indices = (5, 8, 9, 14, 15, 16, 19)
 
