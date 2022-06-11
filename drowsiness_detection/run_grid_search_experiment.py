@@ -26,7 +26,7 @@ from sklearn.linear_model import LogisticRegression
 from drowsiness_detection import config
 from drowsiness_detection.models import build_dummy_tf_classifier, ThreeDStandardScaler, \
     build_dense_model, build_lstm_model, build_cnn_model
-
+import tensorflow as tf
 import os
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -39,7 +39,7 @@ ex.observers.append(FileStorageObserver(Path(__file__).parent.parent.joinpath("l
 
 @ex.config
 def base():
-    seed = 123
+    seed = 45
     test_size = .2
     model_selection_name = "halving-random"
     scaler_name = ""
@@ -90,6 +90,7 @@ def dummy_classification():
 
 @ex.named_config
 def dummy_tf_classification():
+    feature_col_indices = (5, 8, 9, 14, 15, 16, 19)
     nn_experiment = True
     model_selection_name = "random"
     scaler_name = "3D-standard"
@@ -98,7 +99,8 @@ def dummy_tf_classification():
         "n_iter": 2,
         "return_train_score": True,
     }
-    model_init_params = {"input_shape": (20, 300, 23)}
+    model_init_params = {"input_shape": (20, 300, len(feature_col_indices))}
+    fit_params = {"classifier__epochs": 1}
     hyperparameter_specs = [
         dict(name="CategoricalHyperparameter",
              kwargs=dict(name="classifier__activation",
@@ -366,6 +368,15 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
         search = model_selection(estimator=pipe,
                                  param_distributions=param_distribution.get_hyperparameters_dict(),
                                  cv=cv, **grid_search_params, random_state=seed)
+
+    ## add callbock to save history object b/c history is deleted when predict() or
+    ## evaluate() are called on model.
+    if nn_experiment:
+        filename = f"../logs/{ex.current_run._id}/history.csv"
+        history_logger = tf.keras.callbacks.CSVLogger(filename, separator=",", append=False)
+        fit_params = fit_params.copy()
+        fit_params["classifier__callbacks"] = [history_logger]
+
     search.fit(X=X_train, y=y_train, **fit_params)
 
     # log scores of best model
@@ -397,12 +408,6 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
         result_path = Path(ex.observers[0].dir).joinpath("best_model")
         result_path.mkdir()
         new_pipe.named_steps["classifier"].model.save(result_path)
-        history_path = Path("history.pkl")
-        with open(history_path, "wb") as fp:
-            pickle.dump(file=fp, obj=new_pipe.named_steps["classifier"].model.history.history)
-        ex.add_artifact(history_path, name="history.pkl")
-        history_path.unlink()
-
     else:
         result_path = Path("best_model.pkl")
         with open(result_path, "wb") as fp:

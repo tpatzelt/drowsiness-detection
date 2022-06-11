@@ -1,12 +1,14 @@
 import json
+import random
+from csv import DictReader
 from pathlib import Path
 from random import choice
 from typing import Tuple, Union
-import random
 
 import dill as pickle
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 from sklearn.model_selection import train_test_split
 
 from drowsiness_detection import config
@@ -322,12 +324,30 @@ def load_experiment_search_results(experiment_id: int, log_dir: str = "../../log
         return pickle.load(fp)
 
 
-def load_experiment_objects(experiment_id: Union[str,int], log_dir: str = "../../logs/"):
+def load_experiment_objects(experiment_id: Union[str, int], log_dir: str = "../../logs/"):
     print("loading from experiment with id: ", experiment_id)
     config = load_experiment_config(experiment_id, log_dir=log_dir)
     best_model = load_experiment_best_model(experiment_id, log_dir=log_dir)
     search_results = load_experiment_search_results(experiment_id, log_dir=log_dir)
     return config, best_model, search_results
+
+
+def load_experiment_history_nn(experiment_id: Union[str, int], log_dir: str = "../../logs/"):
+    with open(f"{log_dir}{experiment_id}/history.csv", "r") as fp:
+        reader = DictReader(fp)
+        history = dict()
+        for row in reader:
+            history[row.pop("epoch")] = row
+    return history
+
+
+def load_experiment_objects_nn(experiment_id: Union[str, int], log_dir: str = "../../logs/"):
+    print("loading from experiment with id: ", experiment_id)
+    config = load_experiment_config(experiment_id, log_dir=log_dir)
+    search_results = load_experiment_search_results(experiment_id, log_dir=log_dir)
+    best_model = tf.keras.models.load_model(log_dir + f"{experiment_id}/best_model")
+    history = load_experiment_history_nn(experiment_id=experiment_id, log_dir=log_dir)
+    return config, best_model, search_results, history
 
 
 def train_test_split_by_subjects(X, y, num_targets, test_size, subject_data):
@@ -402,6 +422,7 @@ def train_test_split_by_subjects(X, y, num_targets, test_size, subject_data):
 
 def load_preprocessed_train_test_splits(data_path, exclude_sess_type, num_targets, seed, test_size,
                                         split_by_subjects: int = False):
+    import random
     np.random.seed(seed)
     random.seed(seed)
 
@@ -455,7 +476,6 @@ def load_preprocessed_train_val_test_splits_nn(data_path, exclude_sess_type, num
     return X_train, X_val, X_test, y_train, y_val, y_test
 
 if __name__ == '__main__':
-    import random
 
     config.set_paths(30, 10)
     random.seed(42)

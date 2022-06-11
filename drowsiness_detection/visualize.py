@@ -7,7 +7,7 @@ from matplotlib.widgets import Slider
 from sklearn.metrics import RocCurveDisplay
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import auc
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, RandomizedSearchCV, GridSearchCV
 
 from drowsiness_detection import config
 from drowsiness_detection.data import get_session_idx, get_subject_idx
@@ -300,7 +300,14 @@ def plot_search_results(grid):
     for p_k, p_v in grid.best_params_.items():
         masks.append(list(results['param_' + p_k].data == p_v))
 
-    params = grid.param_grid
+    if isinstance(grid, GridSearchCV):
+        params = grid.param_grid
+    elif isinstance(grid, RandomizedSearchCV):
+        params = {key.lstrip("param_"): value for key, value in results.items() if
+                  "classifier" in key}
+
+    else:
+        raise AttributeError("unknown grid")
 
     ## Ploting results
     fig, ax = plt.subplots(1, len(params), sharex='none', sharey='all', figsize=(20, 5))
