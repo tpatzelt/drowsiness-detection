@@ -2,7 +2,7 @@
 from sklearn.base import TransformerMixin
 from sklearn.preprocessing import StandardScaler
 from tensorflow import keras
-
+import math
 
 class ThreeDStandardScaler(TransformerMixin):
     """Custom StandardScaler that can handle 3D input."""
@@ -108,3 +108,11 @@ def build_lstm_model(input_shape,
     model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
     print(model.summary())
     return model
+
+# learning rate schedule
+def step_decay(epoch):
+	initial_lrate = 0.01
+	drop = 0.5
+	epochs_drop = 10.0
+	lrate = initial_lrate * math.pow(drop, math.floor((1+epoch)/epochs_drop))
+	return lrate
