@@ -1,0 +1,83 @@
+{
+  "exclude_by": "a",
+  "feature_col_indices": [
+    5,
+    8,
+    9,
+    14,
+    15,
+    16,
+    19
+  ],
+  "fit_params": {
+    "classifier__batch_size": 20,
+    "classifier__epochs": 25,
+    "classifier__verbose": 0
+  },
+  "grid_search_params": {
+    "error_score": 0,
+    "n_iter": 1,
+    "n_jobs": 1,
+    "refit": false,
+    "return_train_score": true,
+    "scoring": "accuracy",
+    "verbose": 1
+  },
+  "hyperparameter_specs": [
+    {
+      "kwargs": {
+        "log": false,
+        "lower": 8,
+        "name": "classifier__lstm_units",
+        "upper": 128
+      },
+      "name": "UniformIntegerHyperparameter"
+    },
+    {
+      "kwargs": {
+        "log": false,
+        "lower": 0,
+        "name": "classifier__dropout_rate",
+        "upper": 0.5
+      },
+      "name": "UniformFloatHyperparameter"
+    },
+    {
+      "kwargs": {
+        "log": false,
+        "lower": 1,
+        "name": "classifier__num_lstm_layers",
+        "upper": 2
+      },
+      "name": "UniformIntegerHyperparameter"
+    },
+    {
+      "kwargs": {
+        "log": false,
+        "lower": 0,
+        "name": "classifier__learning_rate",
+        "upper": 0.05
+      },
+      "name": "UniformFloatHyperparameter"
+    }
+  ],
+  "model_init_params": {
+    "input_shape": [
+      20,
+      1800,
+      7
+    ]
+  },
+  "model_name": "LSTM",
+  "model_selection_name": "random",
+  "n_splits": 10,
+  "nn_experiment": true,
+  "num_targets": 2,
+  "recording_frequency": 30,
+  "scaler_name": "3D-standard",
+  "seed": 45,
+  "split_by_subjects": true,
+  "test_size": 0.2,
+  "use_dummy_data": false,
+  "window_in_sec": 60
+}
