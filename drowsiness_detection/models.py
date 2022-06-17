@@ -54,7 +54,7 @@ def build_cnn_model(input_shape,
                     num_conv_layers=2,
                     padding="same",
                     use_batch_norm=True,
-                    lr=0.1,
+                    lr=0.01,
                     pooling="average",
                     dropout_rate=.2):
     input_layer = keras.layers.Input(input_shape[1:])
@@ -86,21 +86,25 @@ def build_cnn_model(input_shape,
     return model
 
 def build_lstm_model(input_shape,
-                     lstm1_units=128,
-                     lstm2_units=64,
-                     dropout=.2,
-                     lr=.001):
+                     lstm_units=128,
+                     learning_rate=.001,
+                     dropout_rate=0.2,
+                     num_lstm_layers=2):
     input_layer = keras.layers.Input(input_shape[1:])
-    lstm1 = keras.layers.LSTM(units=lstm1_units, return_sequences=True)(input_layer)
-    lstm2 = keras.layers.LSTM(units=lstm2_units, return_sequences=True)(lstm1)
-    # gap = keras.layers.AveragePooling1D()(lstm2)
-    flatten = keras.layers.Flatten()(lstm2)
-    dropout = keras.layers.Dropout(dropout)(flatten)
+    prev_layer = input_layer
+    return_sequences = True
+    for i in range(num_lstm_layers):
+        if i == num_lstm_layers-1:
+            return_sequences = False
+        lstm = keras.layers.LSTM(units=lstm_units, return_sequences=return_sequences)(prev_layer)
+        prev_layer = lstm
+    flatten = keras.layers.Flatten()(prev_layer)
+    dropout = keras.layers.Dropout(dropout_rate)(flatten)
 
     output_layer = keras.layers.Dense(1, activation="sigmoid")(dropout)
     model = keras.models.Model(inputs=input_layer, outputs=output_layer)
 
-    optimizer = keras.optimizers.Adam(learning_rate=lr)
+    optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
     model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
     print(model.summary())
     return model
