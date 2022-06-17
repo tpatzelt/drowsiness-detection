@@ -333,7 +333,7 @@ def load_experiment_objects(experiment_id: Union[str, int], log_dir: str = "../.
 
 
 def load_experiment_history_nn(experiment_id: Union[str, int], log_dir: str = "../../logs/"):
-    with open(f"{log_dir}{experiment_id}/history.csv", "r") as fp:
+    with open(f"{log_dir}{experiment_id}/train_history.csv", "r") as fp:
         reader = DictReader(fp)
         history = dict()
         for row in reader:
