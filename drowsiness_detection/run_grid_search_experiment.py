@@ -230,7 +230,7 @@ def lstm():
     grid_search_params = {
         "scoring": "accuracy",
         "return_train_score": True,
-        "n_iter": 1,
+        "n_iter": 2,
         "n_jobs": 1,
     }
     fit_params = {"classifier__epochs": 25, "classifier__batch_size": 20, 'classifier__verbose': 0}
@@ -400,6 +400,17 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
         pickle.dump(file=fp, obj=search)
     ex.add_artifact(result_path, name="search_result.pkl")
     result_path.unlink()
+
+    ## add callbock to save history object b/c history is deleted when predict() or
+    ## evaluate() are called on model.
+    # also log history on test set while training
+    if nn_experiment:
+        filename = f"{config.SOURCES_ROOT_PATH.parent}/logs/{ex.current_run._id}/train_history.csv"
+        history_logger = tf.keras.callbacks.CSVLogger(filename, separator=",", append=False)
+        fit_params = fit_params.copy()
+        fit_params["classifier__callbacks"] = [history_logger]
+
+        fit_params["classifier__validation_data"] = (X_test, y_test)
 
     # train model on entire dataset
     new_pipe: Pipeline = pipe.set_params(**search.best_params_)  # noqa
