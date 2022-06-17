@@ -1,9 +1,13 @@
 from copy import deepcopy
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from matplotlib import animation
+from matplotlib import cm
 from matplotlib.widgets import Slider
+from scipy.interpolate import griddata
 from sklearn.metrics import RocCurveDisplay
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import auc
@@ -11,7 +15,8 @@ from sklearn.model_selection import StratifiedKFold, RandomizedSearchCV, GridSea
 
 from drowsiness_detection import config
 from drowsiness_detection.data import get_session_idx, get_subject_idx
-from drowsiness_detection.data import (load_experiment_objects, load_preprocessed_train_test_splits,
+from drowsiness_detection.data import (load_experiment_objects, load_experiment_objects_nn)
+from drowsiness_detection.data import (load_preprocessed_train_test_splits,
                                        session_type_mapping)
 
 
@@ -426,3 +431,104 @@ def plot_learning_curve_from_log_dir(experiment_id, n_estimator_options, ax=None
                                     n_estimator_options=n_estimator_options,
                                     window_size=window_size, ax=ax)
     plt.tight_layout()
+
+
+def plot_learning_curve_from_keras_history(history, title="Learning Curve"):
+    train_acc, test_acc = [], []
+    train_loss, test_loss = [], []
+    epochs = []
+    for epoch, vals in history.items():
+        train_acc.append(float(vals["accuracy"]))
+        test_acc.append(float(vals["val_accuracy"]))
+        train_loss.append(float(vals["loss"]))
+        test_loss.append(float(vals["val_loss"]))
+        epochs.append(epoch)
+
+    def plot_learning_curve_from_values(train_vals, test_vals, x_axis_vals,
+                                        title, y_label, ax=None):
+        if ax is None:
+            fig, ax = plt.subplots()
+        ax.set_title(title)
+        ax.plot(x_axis_vals, train_vals, '-r', label="train")
+        ax.plot(x_axis_vals, test_vals, '-g', label="test")
+        ax.set_xlabel("Number of Steps")
+        ax.set_ylabel(y_label)
+        _ = ax.legend()
+
+    fig, axes = plt.subplots(2, 1)
+    plot_learning_curve_from_values(train_acc, test_acc, epochs,
+                                    title=title, ax=axes[0], y_label="Accuracy")
+    plot_learning_curve_from_values(train_loss, test_loss, epochs,
+                                    title=title, ax=axes[1], y_label="Loss")
+    plt.tight_layout()
+
+
+def plot_cv_test_train_scores_as_scatter(search_results, model_type="lstm"):
+    if model_type == "cnn":
+        col_parameters = [
+            'param_classifier__dropout_rate', 'param_classifier__kernel_size',
+            'param_classifier__num_conv_layers', 'param_classifier__num_filters',
+            'param_classifier__pooling', 'param_classifier__stride',
+        ]
+    elif model_type == "lstm":
+        col_parameters = ["param_classifier__lstm1_units", "param_classifier__lstm2_units"]
+    else:
+        raise ValueError()
+    general_columns = ['mean_test_score',
+                       'rank_test_score', 'mean_train_score']
+    df = pd.DataFrame.from_dict(search_results.cv_results_)
+    df = df[col_parameters + general_columns]
+    fig, ax = plt.subplots()
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2',
+              '#7f7f7f', '#bcbd22', '#17becf']
+    i = 0
+    points1 = []
+    points2 = []
+    param_dicts = []
+    for index, row in df.sort_values(by=["rank_test_score"]).iloc[:len(colors)].iterrows():
+        param_dict = {param.replace("param_classifier__", ""): value for param, value in
+                      row.iteritems() if "param" in param}
+        param_dicts.append(param_dict)
+        train_score = row["mean_train_score"]
+        test_score = row["mean_test_score"]
+        points1.append(ax.scatter(i, train_score, c=colors[i], marker="o"))
+        points2.append(ax.scatter(i, test_score, c=colors[i], marker="+"))
+        i += 1
+    ax.legend(points1 + points2, ([""] * len(param_dicts) + param_dicts),
+              scatterpoints=1, ncol=2)
+    plt.show()
+
+
+def plot_loss_surface(experiment_id, hp1_name, hp2_name, log_dir="../../logs_to_keep/"):
+    if Path(log_dir).joinpath(f"{experiment_id}/best_model.pkl").exists():
+        config, best_model, search_results = load_experiment_objects(experiment_id=experiment_id,
+                                                                     log_dir=log_dir)
+    else:
+        exp_config, best_model, search_results, history = load_experiment_objects_nn(
+            experiment_id=experiment_id,
+            log_dir=log_dir)
+
+    hp1 = search_results.cv_results_[f"param_classifier__{hp1_name}"]
+    hp2 = search_results.cv_results_[f"param_classifier__{hp2_name}"]
+    scores = search_results.cv_results_["mean_test_score"]
+
+    plt.rcParams["figure.figsize"] = 10, 10
+    fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+
+    min_hp1, max_hp1 = min(hp1), max(hp1)
+    min_hp2, max_hp2 = min(hp2), max(hp2)
+    x1 = np.linspace(min_hp1, max_hp1, 100)
+    y1 = np.linspace(min_hp2, max_hp2, 100)
+    # Make data.
+    x2, y2 = np.meshgrid(x1, y1)
+    z2 = griddata(points=(hp1, hp2), values=scores, xi=(x2, y2), method="cubic")
+
+    surf = ax.plot_surface(x2, y2, z2, cmap=cm.coolwarm,
+                           linewidth=0, antialiased=False)
+    # ax.set_yticklabels(np.logspace(1,4,num=7).astype(int).astype(str))
+    ax.set_title('Loss Surface for Different Hyperparameter Combinations')
+    ax.set_xlabel(hp1_name)
+    ax.set_ylabel(hp2_name)
+    ax.set_zlabel("Mean Accuracy on Training Data")
+
+    plt.show()
