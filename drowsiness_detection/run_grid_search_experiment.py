@@ -169,6 +169,7 @@ def random_forest():
     ]
     model_init_params = {}
 
+
 @ex.named_config
 def dense_nn():
     nn_experiment = True
@@ -230,10 +231,10 @@ def lstm():
     grid_search_params = {
         "scoring": "accuracy",
         "return_train_score": True,
-        "n_iter": 2,
+        "n_iter": 20,
         "n_jobs": 1,
     }
-    fit_params = {"classifier__epochs": 25, "classifier__batch_size": 20, 'classifier__verbose': 0}
+    fit_params = {"classifier__epochs": 25, "classifier__batch_size": 40, 'classifier__verbose': 0}
     model_init_params = {"input_shape": (20, 1800, 7)}
     scaler_name = "3D-standard"
     hyperparameter_specs = [
@@ -242,9 +243,9 @@ def lstm():
         # dict(name="UniformIntegerHyperparameter",
         #      kwargs=dict(name="classifier__lstm2_units", lower=8, upper=128, log=False)),
         dict(name="UniformFloatHyperparameter",
-             kwargs=dict(name="classifier__dropout_rate", lower=0, upper=.5, log=False)),
-        dict(name="UniformIntegerHyperparameter", # inclusive interval
-             kwargs=dict(name="classifier__num_lstm_layers", lower=1, upper=2, log=False)),
+             kwargs=dict(name="classifier__dropout_rate", lower=0.3, upper=.5, log=False)),
+        dict(name="UniformIntegerHyperparameter",  # inclusive interval
+             kwargs=dict(name="classifier__num_lstm_layers", lower=1, upper=3, log=False)),
         dict(name="UniformFloatHyperparameter",
              kwargs=dict(name="classifier__learning_rate", lower=0, upper=0.05, log=False)),
     ]
@@ -274,7 +275,7 @@ def parse_model_name(model_name: str, model_init_params={}):
             return build_cnn_model(kernel_size=kernel_size, stride=stride,
                                    num_filters=num_filters, num_conv_layers=num_conv_layers,
                                    pooling=pooling, dropout_rate=dropout_rate,
-                                    **model_init_params)
+                                   **model_init_params)
 
         model = KerasClassifier(build_fn=model_fn)
     elif model_name == "LSTM":
@@ -314,21 +315,9 @@ def parse_scaler_name(scaler_name: str):
     return scaler
 
 
-@ex.automain
-def run(recording_frequency: int, window_in_sec: int, model_selection_name: str, scaler_name: str,
-        grid_search_params: dict, model_name: str, exclude_by: str, hyperparameter_specs: dict,
-        seed, test_size: float, n_splits: int, num_targets: int, use_dummy_data: bool,
-        split_by_subjects: bool, fit_params: dict, model_init_params: dict, nn_experiment: bool,
-        feature_col_indices: Tuple):
-    # set up global paths and cache dir for pipeline
-    config.set_paths(frequency=recording_frequency, seconds=window_in_sec)
-
-    print(f"Starting experiment on {window_in_sec} sec data with {num_targets} targets.")
-
-    # load model
-    model = parse_model_name(model_name=model_name, model_init_params=model_init_params)
-    scaler = parse_scaler_name(scaler_name=scaler_name)
-    # load data
+def load_experiment_data(feature_col_indices, seed,
+                         use_dummy_data, test_size, nn_experiment, exclude_by, num_targets,
+                         split_by_subjects):
     if use_dummy_data:
         num_samples = 200
         num_feature_cols = len(feature_col_indices)
@@ -363,31 +352,26 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     del X_val, y_val
     print(f"X_train shape: {X_train.shape}, y_train shape: {y_train.shape}")
     print(f"X_test shape: {X_test.shape}, y_test shape: {y_test.shape}")
+    return X_train, X_test, y_train, y_test, split_idx
 
-    cv = PredefinedSplit(test_fold=split_idx)
 
-    pipe = Pipeline([("scaler", scaler), ("classifier", model)])
-    param_distribution = spec_to_config_space(specs=hyperparameter_specs)
-
+def init_model_selection(model_selection_name, estimator, param_distribution, cv,
+                         grid_search_params, seed):
     model_selection = parse_model_selection_name(model_selection_name=model_selection_name)
     if model_selection is GridSearchCV:
-        raise NotImplementedError("Grid search does not work with hyperparameter dict.")
+        ## not tested
+        search = model_selection(estimator=estimator,
+                                 param_grid=param_distribution.sample_configuration(
+                                     grid_search_params.pop("n_iter")),
+                                 cv=cv, **grid_search_params)
     else:
-        search = model_selection(estimator=pipe,
+        search = model_selection(estimator=estimator,
                                  param_distributions=param_distribution.get_hyperparameters_dict(),
                                  cv=cv, **grid_search_params, random_state=seed)
+    return search
 
-    ## add callbock to save history object b/c history is deleted when predict() or
-    ## evaluate() are called on model.
-    if nn_experiment:
-        filename = f"../logs/{ex.current_run._id}/history.csv"
-        history_logger = tf.keras.callbacks.CSVLogger(filename, separator=",", append=False)
-        fit_params = fit_params.copy()
-        fit_params["classifier__callbacks"] = [history_logger]
 
-    search.fit(X=X_train, y=y_train, **fit_params)
-
-    # log scores of best model
+def save_search_results(search):
     ex.info["best_cv_test_" + search.scoring] = float(
         search.cv_results_["mean_test_score"][search.best_index_])
     ex.info["best_cv_train_" + search.scoring] = float(
@@ -401,35 +385,79 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     ex.add_artifact(result_path, name="search_result.pkl")
     result_path.unlink()
 
-    ## add callbock to save history object b/c history is deleted when predict() or
-    ## evaluate() are called on model.
-    # also log history on test set while training
+
+def add_callbacks_to_fit_params(fit_params, validation_data):
+    filename = f"{config.SOURCES_ROOT_PATH.parent}/logs/{ex.current_run._id}/train_history.csv"
+    history_logger = tf.keras.callbacks.CSVLogger(filename, separator=",", append=False)
+    fit_params = fit_params.copy()
+    fit_params["classifier__callbacks"] = [history_logger]
+
+    fit_params["classifier__validation_data"] = validation_data
+    return fit_params
+
+
+def log_train_and_test_score(estimator, search, X_train, X_test, y_train, y_test):
+    train_score = estimator.score(X_train, y_train)
+    ex.info["train_" + search.scoring] = float(train_score)
+    test_score = estimator.score(X_test, y_test)
+    ex.info["test_" + search.scoring] = float(test_score)
+
+
+def save_best_model(estimator):
+    if isinstance(estimator.named_steps["classifier"], KerasClassifier):
+        result_path = Path(ex.observers[0].dir).joinpath("best_model")
+        result_path.mkdir()
+        estimator.named_steps["classifier"].model.save(result_path)
+    else:
+        result_path = Path("best_model.pkl")
+        with open(result_path, "wb") as fp:
+            pickle.dump(file=fp, obj=estimator)
+        ex.add_artifact(result_path, name="best_model.pkl")
+        result_path.unlink()
+
+
+@ex.automain
+def run(recording_frequency: int, window_in_sec: int, model_selection_name: str, scaler_name: str,
+        grid_search_params: dict, model_name: str, exclude_by: str, hyperparameter_specs: dict,
+        seed, test_size: float, n_splits: int, num_targets: int, use_dummy_data: bool,
+        split_by_subjects: bool, fit_params: dict, model_init_params: dict, nn_experiment: bool,
+        feature_col_indices: Tuple):
+    config.set_paths(frequency=recording_frequency, seconds=window_in_sec)
+    print(f"Starting experiment on {window_in_sec} sec data with {num_targets} targets.")
+
+    # load model
+    model = parse_model_name(model_name=model_name, model_init_params=model_init_params)
+    scaler = parse_scaler_name(scaler_name=scaler_name)
+    pipe = Pipeline([("scaler", scaler), ("classifier", model)])
+    param_distribution = spec_to_config_space(specs=hyperparameter_specs)
+
+    # load data
+    X_train, X_test, y_train, y_test, split_idx = load_experiment_data(
+        feature_col_indices=feature_col_indices, seed=seed, use_dummy_data=use_dummy_data,
+        test_size=test_size, nn_experiment=nn_experiment, exclude_by=exclude_by,
+        num_targets=num_targets, split_by_subjects=split_by_subjects)
+
+    cv = PredefinedSplit(test_fold=split_idx)
+    search = init_model_selection(model_selection_name, estimator=pipe,
+                                  param_distribution=param_distribution, cv=cv,
+                                  grid_search_params=grid_search_params, seed=seed)
+
+    search.fit(X=X_train, y=y_train, **fit_params)
+
+    # log scores of best model
+    save_search_results(search=search)
+
+    # initialize estimator with best params and retrain on complete dataset
     if nn_experiment:
-        filename = f"{config.SOURCES_ROOT_PATH.parent}/logs/{ex.current_run._id}/train_history.csv"
-        history_logger = tf.keras.callbacks.CSVLogger(filename, separator=",", append=False)
-        fit_params = fit_params.copy()
-        fit_params["classifier__callbacks"] = [history_logger]
-
-        fit_params["classifier__validation_data"] = (X_test, y_test)
-
+        fit_params = add_callbacks_to_fit_params(fit_params=fit_params,
+                                                 validation_data=(X_test, y_test))
     # train model on entire dataset
     new_pipe: Pipeline = pipe.set_params(**search.best_params_)  # noqa
     new_pipe.fit(X=X_train, y=y_train, **fit_params)
 
     # log metrics on test and train set
-    train_score = new_pipe.score(X_train, y_train)
-    ex.info["train_" + search.scoring] = float(train_score)
-    test_score = new_pipe.score(X_test, y_test)
-    ex.info["test_" + search.scoring] = float(test_score)
+    log_train_and_test_score(estimator=new_pipe, search=search, X_train=X_train, X_test=X_test,
+                             y_train=y_train, y_test=y_test)
 
-    # save all search results
-    if isinstance(new_pipe.named_steps["classifier"], KerasClassifier):
-        result_path = Path(ex.observers[0].dir).joinpath("best_model")
-        result_path.mkdir()
-        new_pipe.named_steps["classifier"].model.save(result_path)
-    else:
-        result_path = Path("best_model.pkl")
-        with open(result_path, "wb") as fp:
-            pickle.dump(file=fp, obj=new_pipe)
-        ex.add_artifact(result_path, name="best_model.pkl")
-        result_path.unlink()
+    # save best model instance
+    save_best_model(estimator=new_pipe)
