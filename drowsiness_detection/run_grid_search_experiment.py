@@ -231,10 +231,10 @@ def lstm():
     grid_search_params = {
         "scoring": "accuracy",
         "return_train_score": True,
-        "n_iter": 20,
+        "n_iter": 1,
         "n_jobs": 1,
     }
-    fit_params = {"classifier__epochs": 25, "classifier__batch_size": 40, 'classifier__verbose': 0}
+    fit_params = {"classifier__epochs": 5, "classifier__batch_size": 40, 'classifier__verbose': 0}
     model_init_params = {"input_shape": (20, 1800, 7)}
     scaler_name = "3D-standard"
     hyperparameter_specs = [
@@ -280,6 +280,11 @@ def parse_model_name(model_name: str, model_init_params={}):
         model = KerasClassifier(build_fn=model_fn)
     elif model_name == "LSTM":
         def model_fn(lstm_units, dropout_rate, num_lstm_layers, learning_rate):
+            lstm_units = 42
+            dropout_rate = 0.5
+            num_lstm_layers = 1
+            learning_rate = 0.027
+            print("HARDCODED HYPERPARAMS")
             return build_lstm_model(lstm_units=lstm_units,
                                     dropout_rate=dropout_rate, num_lstm_layers=num_lstm_layers,
                                     learning_rate=learning_rate,
