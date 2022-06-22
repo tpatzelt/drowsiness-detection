@@ -4,7 +4,7 @@ from pathlib import Path
 
 from drowsiness_detection.data import load_experiment_objects
 
-with open('../logs/log_summary.csv', 'w', newline='') as csvfile:
+with open('../logs_to_keep/log_summary.csv', 'w', newline='') as csvfile:
     fieldnames = ['id', 'model_name', 'window_in_sec', 'description', 'seed', 'test_size',
                   'model_parameter', 'train_acc', 'test_acc', 'cv_train_acc', 'cv_test_acc']
     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
