@@ -437,6 +437,7 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     param_distribution = spec_to_config_space(specs=hyperparameter_specs)
 
     # load data
+    print("loading data")
     X_train, X_test, y_train, y_test, split_idx = load_experiment_data(
         feature_col_indices=feature_col_indices, seed=seed, use_dummy_data=use_dummy_data,
         test_size=test_size, nn_experiment=nn_experiment, exclude_by=exclude_by,
@@ -446,9 +447,9 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     search = init_model_selection(model_selection_name, estimator=pipe,
                                   param_distribution=param_distribution, cv=cv,
                                   grid_search_params=grid_search_params, seed=seed)
-
+    print("starting hyperparameter search")
     search.fit(X=X_train, y=y_train, **fit_params)
-
+    print("finished finding the best hyperparameters")
     # log scores of best model
     save_search_results(search=search)
     best_params = search.best_params_.copy()
@@ -459,10 +460,12 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
         fit_params = add_callbacks_to_fit_params(fit_params=fit_params,
                                                  validation_data=(X_test, y_test))
     # train model on entire dataset
+    print("start training best model on complete training and validation data")
     new_pipe: Pipeline = pipe.set_params(**best_params)  # noqa
     new_pipe.fit(X=X_train, y=y_train, **fit_params)
 
     # log metrics on test and train set
+    print("log scores and training and test set")
     log_train_and_test_score(estimator=new_pipe, scoring=grid_search_params["scoring"],
                              X_train=X_train, X_test=X_test,
                              y_train=y_train, y_test=y_test)
