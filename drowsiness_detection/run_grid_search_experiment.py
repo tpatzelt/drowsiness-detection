@@ -234,7 +234,7 @@ def lstm():
         "n_iter": 1,
         "n_jobs": 1,
     }
-    fit_params = {"classifier__epochs": 5, "classifier__batch_size": 40, 'classifier__verbose': 0}
+    fit_params = {"classifier__epochs": 5, "classifier__batch_size": 30, 'classifier__verbose': 1}
     model_init_params = {"input_shape": (20, 1800, 7)}
     scaler_name = "3D-standard"
     hyperparameter_specs = [
@@ -401,11 +401,11 @@ def add_callbacks_to_fit_params(fit_params, validation_data):
     return fit_params
 
 
-def log_train_and_test_score(estimator, search, X_train, X_test, y_train, y_test):
+def log_train_and_test_score(estimator, scoring, X_train, X_test, y_train, y_test):
     train_score = estimator.score(X_train, y_train)
-    ex.info["train_" + search.scoring] = float(train_score)
+    ex.info["train_" + scoring] = float(train_score)
     test_score = estimator.score(X_test, y_test)
-    ex.info["test_" + search.scoring] = float(test_score)
+    ex.info["test_" + scoring] = float(test_score)
 
 
 def save_best_model(estimator):
@@ -451,17 +451,20 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
 
     # log scores of best model
     save_search_results(search=search)
+    best_params = search.best_params_.copy()
+    del search
 
     # initialize estimator with best params and retrain on complete dataset
     if nn_experiment:
         fit_params = add_callbacks_to_fit_params(fit_params=fit_params,
                                                  validation_data=(X_test, y_test))
     # train model on entire dataset
-    new_pipe: Pipeline = pipe.set_params(**search.best_params_)  # noqa
+    new_pipe: Pipeline = pipe.set_params(**best_params)  # noqa
     new_pipe.fit(X=X_train, y=y_train, **fit_params)
 
     # log metrics on test and train set
-    log_train_and_test_score(estimator=new_pipe, search=search, X_train=X_train, X_test=X_test,
+    log_train_and_test_score(estimator=new_pipe, scoring=grid_search_params["scoring"],
+                             X_train=X_train, X_test=X_test,
                              y_train=y_train, y_test=y_test)
 
     # save best model instance
