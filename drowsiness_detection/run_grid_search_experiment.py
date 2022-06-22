@@ -280,11 +280,6 @@ def parse_model_name(model_name: str, model_init_params={}):
         model = KerasClassifier(build_fn=model_fn)
     elif model_name == "LSTM":
         def model_fn(lstm_units, dropout_rate, num_lstm_layers, learning_rate):
-            lstm_units = 42
-            dropout_rate = 0.5
-            num_lstm_layers = 1
-            learning_rate = 0.027
-            print("HARDCODED HYPERPARAMS")
             return build_lstm_model(lstm_units=lstm_units,
                                     dropout_rate=dropout_rate, num_lstm_layers=num_lstm_layers,
                                     learning_rate=learning_rate,
