@@ -2,3 +2,5 @@
 {4,5,6} max depth/min sample size random cv search test size .2
 {7,8,9,1ß,11} max depth/min sample size random cv search test size .2 with different seeds
 {12,13,10} max depth/min sample size random cv search test size .2 and seed=45
+93 cnn on 60 sec data
+99 lstm with broken history but on 60 sec data with many candidates
