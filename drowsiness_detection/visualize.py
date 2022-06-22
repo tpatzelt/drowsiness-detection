@@ -471,7 +471,8 @@ def plot_cv_test_train_scores_as_scatter(search_results, model_type="lstm"):
             'param_classifier__pooling', 'param_classifier__stride',
         ]
     elif model_type == "lstm":
-        col_parameters = ["param_classifier__lstm1_units", "param_classifier__lstm2_units"]
+        col_parameters = ["param_classifier__lstm_units", "param_classifier__dropout_rate",
+                          "param_classifier__num_lstm_layers", "param_classifier__learning_rate"]
     else:
         raise ValueError()
     general_columns = ['mean_test_score',
