@@ -489,7 +489,7 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     del search
 
     # initialize estimator with best params and retrain on complete dataset
-    if nn_experiment:
+    if nn_experiment and model_name != "MINIROCKET":
         fit_params = add_callbacks_to_fit_params(fit_params=fit_params,
                                                  validation_data=(X_test, y_test))
     # train model on entire dataset
