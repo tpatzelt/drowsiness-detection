@@ -9,6 +9,7 @@ from sklearn.model_selection import HalvingRandomSearchCV, RandomizedSearchCV, t
     GridSearchCV, PredefinedSplit
 import numpy as np
 from typing import Tuple
+from sktime.transformations.panel.rocket import MiniRocketMultivariate
 from sklearn.pipeline import Pipeline
 from keras.wrappers.scikit_learn import KerasClassifier
 import dill as pickle
@@ -22,7 +23,7 @@ from pathlib import Path
 from sacred import Experiment
 from sacred.observers import FileStorageObserver
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, RidgeClassifier
 from drowsiness_detection import config
 from drowsiness_detection.models import build_dummy_tf_classifier, ThreeDStandardScaler, \
     build_dense_model, build_lstm_model, build_cnn_model
@@ -43,6 +44,8 @@ def base():
     test_size = .2
     model_selection_name = "halving-random"
     scaler_name = ""
+    scaler_params = {}
+
     recording_frequency = None
     window_in_sec = None
     n_splits = 10
@@ -184,6 +187,8 @@ def dense_nn():
     fit_params = {"classifier__epochs": 2, "classifier__batch_size": 10}
     model_init_params = {"input_shape": (20, 300, 7)}
     scaler_name = "3D-standard"
+    scaler_params = {"feature_axis": -1}
+
     hyperparameter_specs = [
         dict(name="UniformIntegerHyperparameter",
              kwargs=dict(name="classifier__num_hidden", lower=32, upper=2024, log=False)),
@@ -206,6 +211,8 @@ def cnn():
     fit_params = {"classifier__epochs": 25, "classifier__batch_size": 20, 'classifier__verbose': 0}
     model_init_params = {"input_shape": (20, 1800, 7)}
     scaler_name = "3D-standard"
+    scaler_params = {"feature_axis": -1}
+
     hyperparameter_specs = [
         dict(name="UniformIntegerHyperparameter",
              kwargs=dict(name="classifier__num_filters", lower=16, upper=128, log=False)),
@@ -237,6 +244,7 @@ def lstm():
     fit_params = {"classifier__epochs": 5, "classifier__batch_size": 30, 'classifier__verbose': 1}
     model_init_params = {"input_shape": (20, 1800, 7)}
     scaler_name = "3D-standard"
+    scaler_params = {"feature_axis": -1}
     hyperparameter_specs = [
         dict(name="UniformIntegerHyperparameter",
              kwargs=dict(name="classifier__lstm_units", lower=8, upper=128, log=False)),
@@ -248,6 +256,28 @@ def lstm():
              kwargs=dict(name="classifier__num_lstm_layers", lower=1, upper=3, log=False)),
         dict(name="UniformFloatHyperparameter",
              kwargs=dict(name="classifier__learning_rate", lower=0, upper=0.05, log=False)),
+    ]
+    feature_col_indices = (5, 8, 9, 14, 15, 16, 19)
+
+
+@ex.named_config
+def minirocket():
+    nn_experiment = True
+    model_selection_name = "random"
+    model_name = "MINIROCKET"
+    grid_search_params = {
+        "scoring": "accuracy",
+        "return_train_score": True,
+        "n_iter": 1,
+        "n_jobs": 1,
+    }
+    fit_params = {}
+    model_init_params = {"input_shape": (20, 1800, 7)}
+    scaler_name = "3D-standard"
+    scaler_params = {"feature_axis": -1}
+    hyperparameter_specs = [
+        dict(name="UniformFloatHyperparameter",
+             kwargs=dict(name="classifier__alpha", lower=0, upper=100, log=True)),
     ]
     feature_col_indices = (5, 8, 9, 14, 15, 16, 19)
 
@@ -286,6 +316,8 @@ def parse_model_name(model_name: str, model_init_params={}):
                                     **model_init_params)
 
         model = KerasClassifier(build_fn=model_fn)
+    elif model_name == "MINIROCKET":
+        model = RidgeClassifier()
     else:
         raise ValueError
     return model
@@ -303,13 +335,13 @@ def parse_model_selection_name(model_selection_name: str):
     return model_selection
 
 
-def parse_scaler_name(scaler_name: str):
+def parse_scaler_name(scaler_name: str, scaler_params: dict):
     if scaler_name == "min-max":
-        scaler = MinMaxScaler()
+        scaler = MinMaxScaler(**scaler_params)
     elif scaler_name == "standard":
-        scaler = StandardScaler()
+        scaler = StandardScaler(**scaler_params)
     elif scaler_name == "3D-standard":
-        scaler = ThreeDStandardScaler()
+        scaler = ThreeDStandardScaler(**scaler_params)
     else:
         raise ValueError
     return scaler
@@ -421,14 +453,17 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
         grid_search_params: dict, model_name: str, exclude_by: str, hyperparameter_specs: dict,
         seed, test_size: float, n_splits: int, num_targets: int, use_dummy_data: bool,
         split_by_subjects: bool, fit_params: dict, model_init_params: dict, nn_experiment: bool,
-        feature_col_indices: Tuple):
+        feature_col_indices: Tuple, scaler_params: dict):
     config.set_paths(frequency=recording_frequency, seconds=window_in_sec)
     print(f"Starting experiment on {window_in_sec} sec data with {num_targets} targets.")
 
     # load model
     model = parse_model_name(model_name=model_name, model_init_params=model_init_params)
-    scaler = parse_scaler_name(scaler_name=scaler_name)
-    pipe = Pipeline([("scaler", scaler), ("classifier", model)])
+    scaler = parse_scaler_name(scaler_name=scaler_name, scaler_params=scaler_params)
+    pipeline_steps = [("scaler", scaler), ("classifier", model)]
+    if model_name == "MINIROCKET":
+        pipeline_steps.insert(1, ("minirocket", MiniRocketMultivariate()))
+    pipe = Pipeline(pipeline_steps)
     param_distribution = spec_to_config_space(specs=hyperparameter_specs)
 
     # load data
