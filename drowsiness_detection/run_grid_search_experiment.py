@@ -208,7 +208,8 @@ def cnn():
         "n_iter": 100,
         "n_jobs": 1,
     }
-    fit_params = {"classifier__epochs": 25, "classifier__batch_size": 20, 'classifier__verbose': 0}
+    fit_params = {"classifier__epochs": 25, "classifier__batch_size": 20,
+                  'classifier__verbose': 0}  # more than 15 epochs needed
     model_init_params = {"input_shape": (20, 1800, 7)}
     scaler_name = "3D-standard"
     scaler_params = {"feature_axis": -1}
@@ -241,7 +242,8 @@ def lstm():
         "n_iter": 1,
         "n_jobs": 1,
     }
-    fit_params = {"classifier__epochs": 5, "classifier__batch_size": 30, 'classifier__verbose': 1}
+    fit_params = {"classifier__epochs": 5, "classifier__batch_size": 30,
+                  'classifier__verbose': 1}  # more than 5 epochs needed
     model_init_params = {"input_shape": (20, 1800, 7)}
     scaler_name = "3D-standard"
     scaler_params = {"feature_axis": -1}
