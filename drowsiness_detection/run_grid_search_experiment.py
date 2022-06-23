@@ -256,7 +256,7 @@ def lstm():
              kwargs=dict(name="classifier__num_lstm_layers", lower=1, upper=3, log=False)),
         dict(name="UniformFloatHyperparameter",
              kwargs=dict(name="classifier__learning_rate", lower=0, upper=0.05, log=False)),
-    ]
+    ]  # try smaller learning rate to mitigate nan loss
     feature_col_indices = (5, 8, 9, 14, 15, 16, 19)
 
 
@@ -272,12 +272,14 @@ def minirocket():
         "n_jobs": 1,
     }
     fit_params = {}
-    model_init_params = {"input_shape": (20, 1800, 7)}
+    model_init_params = {"input_shape": (20, 300, 7)}
     scaler_name = "3D-standard"
-    scaler_params = {"feature_axis": -1}
+    scaler_params = {"feature_axis": 1}
     hyperparameter_specs = [
         dict(name="UniformFloatHyperparameter",
              kwargs=dict(name="classifier__alpha", lower=0, upper=100, log=True)),
+        dict(name="CategoricalHyperparameter",
+             kwargs=dict("classifier__normalize", choices=[True])),
     ]
     feature_col_indices = (5, 8, 9, 14, 15, 16, 19)
 
@@ -349,7 +351,7 @@ def parse_scaler_name(scaler_name: str, scaler_params: dict):
 
 def load_experiment_data(feature_col_indices, seed,
                          use_dummy_data, test_size, nn_experiment, exclude_by, num_targets,
-                         split_by_subjects):
+                         split_by_subjects, model_name):
     if use_dummy_data:
         num_samples = 200
         num_feature_cols = len(feature_col_indices)
@@ -382,6 +384,8 @@ def load_experiment_data(feature_col_indices, seed,
     X_train = np.concatenate([X_val, X_train])
     y_train = np.concatenate([y_val, y_train])
     del X_val, y_val
+    if model_name == "MINIROCKET":
+        X_train, X_test = map(lambda X: np.swapaxes(X, 1, 2), (X_train, X_test))
     print(f"X_train shape: {X_train.shape}, y_train shape: {y_train.shape}")
     print(f"X_test shape: {X_test.shape}, y_test shape: {y_test.shape}")
     return X_train, X_test, y_train, y_test, split_idx
@@ -463,6 +467,7 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     pipeline_steps = [("scaler", scaler), ("classifier", model)]
     if model_name == "MINIROCKET":
         pipeline_steps.insert(1, ("minirocket", MiniRocketMultivariate()))
+        # pipeline_steps.insert(2, ("post_scaler", StandardScaler()))
     pipe = Pipeline(pipeline_steps)
     param_distribution = spec_to_config_space(specs=hyperparameter_specs)
 
@@ -471,7 +476,7 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     X_train, X_test, y_train, y_test, split_idx = load_experiment_data(
         feature_col_indices=feature_col_indices, seed=seed, use_dummy_data=use_dummy_data,
         test_size=test_size, nn_experiment=nn_experiment, exclude_by=exclude_by,
-        num_targets=num_targets, split_by_subjects=split_by_subjects)
+        num_targets=num_targets, split_by_subjects=split_by_subjects, model_name=model_name)
 
     cv = PredefinedSplit(test_fold=split_idx)
     search = init_model_selection(model_selection_name, estimator=pipe,
