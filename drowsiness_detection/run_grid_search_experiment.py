@@ -277,9 +277,7 @@ def minirocket():
     scaler_params = {"feature_axis": 1}
     hyperparameter_specs = [
         dict(name="UniformFloatHyperparameter",
-             kwargs=dict(name="classifier__alpha", lower=0, upper=100, log=True)),
-        dict(name="CategoricalHyperparameter",
-             kwargs=dict("classifier__normalize", choices=[True])),
+             kwargs=dict(name="classifier__alpha", lower=0.0001, upper=100, log=True)),
     ]
     feature_col_indices = (5, 8, 9, 14, 15, 16, 19)
 
@@ -319,7 +317,7 @@ def parse_model_name(model_name: str, model_init_params={}):
 
         model = KerasClassifier(build_fn=model_fn)
     elif model_name == "MINIROCKET":
-        model = RidgeClassifier()
+        model = RidgeClassifier(normalize=True)
     else:
         raise ValueError
     return model
