@@ -1,19 +1,26 @@
 """Classification Models"""
+import math
+
 from sklearn.base import TransformerMixin
 from sklearn.preprocessing import StandardScaler
 from tensorflow import keras
-import math
+
 
 class ThreeDStandardScaler(TransformerMixin):
     """Custom StandardScaler that can handle 3D input."""
     scaler = StandardScaler()
 
+    def __init__(self, feature_axis):
+        self.feature_axis = feature_axis
+        super(ThreeDStandardScaler, self).__init__()
+
     def fit(self, X, y, **kwargs):
-        self.scaler.fit(X.reshape(-1, X.shape[-1]), **kwargs)
+        self.scaler.fit(X.reshape(-1, X.shape[self.feature_axis]), **kwargs)
         return self
 
     def transform(self, X, **kwargs):
-        return self.scaler.transform(X.reshape(-1, X.shape[-1]), **kwargs).reshape(X.shape)
+        return self.scaler.transform(X.reshape(-1, X.shape[self.feature_axis]), **kwargs).reshape(
+            X.shape)
 
 
 def build_dummy_tf_classifier(input_shape, activation: str = None, optimizer: str = "adam"):
