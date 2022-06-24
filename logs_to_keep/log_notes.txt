@@ -4,3 +4,6 @@
 {12,13,10} max depth/min sample size random cv search test size .2 and seed=45
 93 cnn on 60 sec data
 99 lstm with broken history but on 60 sec data with one candidates
+102 lstm but with nan loss
+103 cnn but overfitted
+105 minirocket full dataset different alphas
