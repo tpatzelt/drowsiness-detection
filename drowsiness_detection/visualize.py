@@ -10,14 +10,15 @@ from matplotlib.widgets import Slider
 from scipy.interpolate import griddata
 from sklearn.metrics import RocCurveDisplay
 from sklearn.metrics import accuracy_score
-from sklearn.metrics import auc
+from sklearn.metrics import auc, classification_report
 from sklearn.model_selection import StratifiedKFold, RandomizedSearchCV, GridSearchCV
 
 from drowsiness_detection import config
 from drowsiness_detection.data import get_session_idx, get_subject_idx
 from drowsiness_detection.data import (load_experiment_objects, load_experiment_objects_nn)
 from drowsiness_detection.data import (load_preprocessed_train_test_splits,
-                                       session_type_mapping)
+                                       session_type_mapping, label_names_dict)
+from drowsiness_detection.run_grid_search_experiment import load_experiment_data, parse_scaler_name
 
 
 def plot_acc_and_loss(history):
@@ -350,17 +351,16 @@ def plot_roc_curve_from_log_dir(experiment_id=21, plot_train_roc: bool = False, 
         split_by_subjects=exp_config["split_by_subjects"])
 
     print(f"ID {experiment_id}")
-    y_pred = best_estimator.predict(X_test)
-    print(f"test accuracy = {np.mean(y_pred == y_test)}")
-    y_pred = best_estimator.predict(X_train)
-    print(f"train accuracy = {np.mean(y_pred == y_train)}")
-    print()
     RocCurveDisplay.from_estimator(estimator=best_estimator, X=X_test, y=y_test,
                                    name=f"RF-{window_size}s" + ("(test)" if plot_train_roc else ""),
                                    ax=ax, pos_label=pos_label)
     if plot_train_roc:
         RocCurveDisplay.from_estimator(estimator=best_estimator, X=X_train, y=y_train,
                                        name=f"RF-{window_size}s(train)", ax=ax, pos_label=pos_label)
+
+    report = classification_report(y_true=y_test, y_pred=best_estimator.predict(X_test),
+                                   target_names=label_names_dict[exp_config["num_targets"]])
+    print(report)
 
 
 def plot_learning_curve_from_errors(train_errors, test_errors, n_estimator_options,
@@ -533,3 +533,47 @@ def plot_loss_surface(experiment_id, hp1_name, hp2_name, log_dir="../../logs_to_
     ax.set_zlabel("Mean Accuracy on Training Data")
 
     plt.show()
+
+
+def plot_roc_curve_from_log_dir_nn(experiment_id, plot_train_roc: bool = False, ax=None,
+                                   pos_label=1, log_dir="../../logs_to_keep/"):
+    if ax is None:
+        fig, ax = plt.subplots()
+
+    exp_config, best_estimator, search_results, history = load_experiment_objects_nn(
+        experiment_id=experiment_id,
+        log_dir=log_dir)
+    window_size = exp_config["window_in_sec"]
+    config.set_paths(30, window_size)
+
+    # load data
+    X_train, X_test, y_train, y_test, _ = load_experiment_data(
+        exclude_by=exp_config["exclude_by"],
+        num_targets=exp_config["num_targets"],
+        seed=exp_config["seed"],
+        test_size=exp_config["test_size"],
+        split_by_subjects=exp_config["split_by_subjects"],
+        use_dummy_data=exp_config["use_dummy_data"],
+        nn_experiment=exp_config["nn_experiment"],
+        feature_col_indices=exp_config["feature_col_indices"],
+        model_name=exp_config["model_name"])
+
+    print(f"ID {experiment_id}")
+    scaler = parse_scaler_name(exp_config["scaler_name"], exp_config.get("scaler_params", {}))
+    X_train = scaler.fit_transform(X_train, y_train)
+    X_test = scaler.transform(X_test)
+    y_pred_test = best_estimator.predict(X_test)
+    y_pred_train = best_estimator.predict(X_train)
+
+    RocCurveDisplay.from_predictions(y_test, y_pred_test,
+                                     name=f"{window_size}s" + ("(test)" if plot_train_roc else ""),
+                                     ax=ax, pos_label=pos_label)
+    if plot_train_roc:
+        RocCurveDisplay.from_estimator(y_train, y_pred_train,
+                                       name=f"{window_size}s(train)", ax=ax, pos_label=pos_label)
+
+    y_pred_train = y_pred_train > .5
+    y_pred_test = y_pred_test > .5
+    report = classification_report(y_true=y_test, y_pred=y_pred_test,
+                                   target_names=label_names_dict[exp_config["num_targets"]])
+    print(report)
