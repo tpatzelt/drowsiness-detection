@@ -5,17 +5,14 @@ from sacred import SETTINGS
 # explicitly require this experimental feature
 from sklearn.experimental import enable_halving_search_cv  # noqa
 # now you can import normally from model_selection
-from sklearn.model_selection import HalvingRandomSearchCV, RandomizedSearchCV, train_test_split, \
-    GridSearchCV, PredefinedSplit
-import numpy as np
+from sklearn.model_selection import HalvingRandomSearchCV, RandomizedSearchCV, GridSearchCV, \
+    PredefinedSplit
 from typing import Tuple
 from sktime.transformations.panel.rocket import MiniRocketMultivariate
 from sklearn.pipeline import Pipeline
 from keras.wrappers.scikit_learn import KerasClassifier
 import dill as pickle
-from drowsiness_detection.data import (session_type_mapping,
-                                       load_preprocessed_train_val_test_splits,
-                                       load_preprocessed_train_val_test_splits_nn)
+from drowsiness_detection.data import (load_experiment_data)
 from drowsiness_detection.helpers import spec_to_config_space
 from sklearn.dummy import DummyClassifier
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
@@ -347,48 +344,6 @@ def parse_scaler_name(scaler_name: str, scaler_params: dict):
     else:
         raise ValueError
     return scaler
-
-
-def load_experiment_data(feature_col_indices, seed,
-                         use_dummy_data, test_size, nn_experiment, exclude_by, num_targets,
-                         split_by_subjects, model_name):
-    if use_dummy_data:
-        num_samples = 200
-        num_feature_cols = len(feature_col_indices)
-        X = np.random.random(num_samples * 300 * num_feature_cols).reshape(
-            (num_samples, 300, num_feature_cols))
-        y = np.concatenate((np.zeros((num_samples // 2)), np.ones((num_samples // 2))))
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
-                                                            random_state=seed)
-        X_train, X_val, y_train, y_val = train_test_split(X_train, y_train,
-                                                          test_size=test_size * (1 - test_size),
-                                                          random_state=seed)
-    else:
-        if nn_experiment:
-            X_train, X_val, X_test, y_train, y_val, y_test = load_preprocessed_train_val_test_splits_nn(
-                data_path=config.PATHS.WINDOW_DATA,
-                exclude_sess_type=session_type_mapping[exclude_by],
-                num_targets=num_targets, seed=seed, test_size=test_size,
-                feature_col_indices=feature_col_indices)
-
-        else:
-            X_train, X_val, X_test, y_train, y_val, y_test = load_preprocessed_train_val_test_splits(
-                data_path=config.PATHS.WINDOW_FEATURES,
-                exclude_sess_type=session_type_mapping[exclude_by],
-                num_targets=num_targets, seed=seed, test_size=test_size,
-                split_by_subjects=split_by_subjects)
-
-    # need to have extra validation set so that we have the indices of the subjects,
-    # then put together with training set
-    split_idx = np.concatenate([np.ones(len(X_val)), np.repeat(-1, len(X_train))])
-    X_train = np.concatenate([X_val, X_train])
-    y_train = np.concatenate([y_val, y_train])
-    del X_val, y_val
-    if model_name == "MINIROCKET":
-        X_train, X_test = map(lambda X: np.swapaxes(X, 1, 2), (X_train, X_test))
-    print(f"X_train shape: {X_train.shape}, y_train shape: {y_train.shape}")
-    print(f"X_test shape: {X_test.shape}, y_test shape: {y_test.shape}")
-    return X_train, X_test, y_train, y_test, split_idx
 
 
 def init_model_selection(model_selection_name, estimator, param_distribution, cv,
