@@ -202,7 +202,7 @@ def cnn():
     grid_search_params = {
         "scoring": "accuracy",
         "return_train_score": True,
-        "n_iter": 100,
+        "n_iter": 2,
         "n_jobs": 1,
     }
     fit_params = {"classifier__epochs": 25, "classifier__batch_size": 20,
@@ -221,9 +221,9 @@ def cnn():
         dict(name="CategoricalHyperparameter",
              kwargs=dict(name="classifier__pooling", choices=["average", "max"])),
         dict(name="UniformIntegerHyperparameter",
-             kwargs=dict(name="classifier__num_conv_layers", lower=1, upper=3, log=False)),
+             kwargs=dict(name="classifier__num_conv_layers", lower=1, upper=2, log=False)),
         dict(name="UniformFloatHyperparameter",
-             kwargs=dict(name="classifier__dropout_rate", lower=0.2, upper=.6, log=False)),
+             kwargs=dict(name="classifier__dropout_rate", lower=0.4, upper=.8, log=False)),
     ]
     feature_col_indices = (5, 8, 9, 14, 15, 16, 19)
 
@@ -236,10 +236,10 @@ def lstm():
     grid_search_params = {
         "scoring": "accuracy",
         "return_train_score": True,
-        "n_iter": 1,
+        "n_iter": 5,
         "n_jobs": 1,
     }
-    fit_params = {"classifier__epochs": 5, "classifier__batch_size": 30,
+    fit_params = {"classifier__epochs": 15, "classifier__batch_size": 30,
                   'classifier__verbose': 1}  # more than 5 epochs needed
     model_init_params = {"input_shape": (20, 1800, 7)}
     scaler_name = "3D-standard"
@@ -254,7 +254,7 @@ def lstm():
         dict(name="UniformIntegerHyperparameter",  # inclusive interval
              kwargs=dict(name="classifier__num_lstm_layers", lower=1, upper=3, log=False)),
         dict(name="UniformFloatHyperparameter",
-             kwargs=dict(name="classifier__learning_rate", lower=0, upper=0.05, log=False)),
+             kwargs=dict(name="classifier__learning_rate", lower=0.0001, upper=0.05, log=True)),
     ]  # try smaller learning rate to mitigate nan loss
     feature_col_indices = (5, 8, 9, 14, 15, 16, 19)
 
@@ -267,16 +267,16 @@ def minirocket():
     grid_search_params = {
         "scoring": "accuracy",
         "return_train_score": True,
-        "n_iter": 1,
+        "n_iter": 5,
         "n_jobs": 1,
     }
     fit_params = {}
-    model_init_params = {"input_shape": (20, 300, 7)}
+    model_init_params = {"input_shape": (20, 1800, 7)}
     scaler_name = "3D-standard"
     scaler_params = {"feature_axis": 1}
     hyperparameter_specs = [
         dict(name="UniformFloatHyperparameter",
-             kwargs=dict(name="classifier__alpha", lower=0.0001, upper=100, log=True)),
+             kwargs=dict(name="classifier__alpha", lower=0.1, upper=100, log=True)),
     ]
     feature_col_indices = (5, 8, 9, 14, 15, 16, 19)
 
