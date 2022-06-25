@@ -96,6 +96,9 @@
   "num_targets": 2,
   "recording_frequency": 30,
   "scaler_name": "3D-standard",
+  "scaler_params": {
+    "feature_axis": -1
+  },
   "seed": 45,
   "split_by_subjects": true,
   "test_size": 0.2,
