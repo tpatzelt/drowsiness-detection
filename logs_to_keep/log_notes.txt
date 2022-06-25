@@ -5,5 +5,6 @@
 93 cnn on 60 sec data
 99 lstm with broken history but on 60 sec data with one candidates
 102 lstm but with nan loss
-103 cnn but overfitted
+103 cnn but overfitted with one candidate
 105 minirocket full dataset different alphas
+109 CNN with two candidates
