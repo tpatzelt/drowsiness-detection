@@ -102,7 +102,7 @@ def dummy_tf_classification():
         "return_train_score": True,
     }
     model_init_params = {"input_shape": (20, 300, len(feature_col_indices))}
-    fit_params = {"classifier__epochs": 1}
+    fit_params = {"classifier__epochs": 1, "classifier__class_weight": {"0": 0.84, "1": 1.14}}
     hyperparameter_specs = [
         dict(name="CategoricalHyperparameter",
              kwargs=dict(name="classifier__activation",
@@ -208,7 +208,7 @@ def cnn():
         "n_jobs": 1,
     }
     fit_params = {"classifier__epochs": 25, "classifier__batch_size": 20,
-                  'classifier__verbose': 0}  # more than 15 epochs needed
+                  'classifier__verbose': 0, "classifier__class_weight": {"0": 0.84, "1": 1.14}}
     model_init_params = {"input_shape": (20, 1800, 7)}
     scaler_name = "3D-standard"
     scaler_params = {"feature_axis": -1}
@@ -242,7 +242,7 @@ def lstm():
         "n_jobs": 1,
     }
     fit_params = {"classifier__epochs": 15, "classifier__batch_size": 30,
-                  'classifier__verbose': 1}  # more than 5 epochs needed
+                  'classifier__verbose': 1, "classifier__class_weight": {"0": 0.84, "1": 1.14}}
     model_init_params = {"input_shape": (20, 1800, 7)}
     scaler_name = "3D-standard"
     scaler_params = {"feature_axis": -1}
@@ -279,6 +279,8 @@ def minirocket():
     hyperparameter_specs = [
         dict(name="UniformFloatHyperparameter",
              kwargs=dict(name="classifier__alpha", lower=0.1, upper=100, log=True)),
+        dict(name="CategoricalHyperparameter",
+             kwargs=dict(name="classifier__class_weight", choices=["balanced"])),
     ]
     feature_col_indices = (5, 8, 9, 14, 15, 16, 19)
 
@@ -409,12 +411,23 @@ def save_best_model(estimator):
         result_path.unlink()
 
 
+def parse_fit_params(fit_params):
+    class_weights = fit_params.get("classifier__class_weight", None)
+    if class_weights:
+        new_fit_params = fit_params.copy()
+        new_fit_params["classifier__class_weight"] = {int(key): value for key, value in
+                                                      class_weights.items()}
+    return new_fit_params
+
+
 @ex.automain
 def run(recording_frequency: int, window_in_sec: int, model_selection_name: str, scaler_name: str,
         grid_search_params: dict, model_name: str, exclude_by: str, hyperparameter_specs: dict,
         seed, test_size: float, n_splits: int, num_targets: int, use_dummy_data: bool,
         split_by_subjects: bool, fit_params: dict, model_init_params: dict, nn_experiment: bool,
         feature_col_indices: Tuple, scaler_params: dict):
+    fit_params = parse_fit_params(fit_params=fit_params)
+
     config.set_paths(frequency=recording_frequency, seconds=window_in_sec)
     print(f"Starting experiment on {window_in_sec} sec data with {num_targets} targets.")
 
