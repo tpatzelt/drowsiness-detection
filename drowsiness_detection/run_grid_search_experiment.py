@@ -204,10 +204,10 @@ def cnn():
     grid_search_params = {
         "scoring": "accuracy",
         "return_train_score": True,
-        "n_iter": 2,
+        "n_iter": 1,
         "n_jobs": 1,
     }
-    fit_params = {"classifier__epochs": 25, "classifier__batch_size": 20,
+    fit_params = {"classifier__epochs": 100, "classifier__batch_size": 20,
                   'classifier__verbose': 0, "classifier__class_weight": {"0": 0.84, "1": 1.14}}
     model_init_params = {"input_shape": (20, 1800, 7)}
     scaler_name = "3D-standard"
@@ -241,7 +241,7 @@ def lstm():
         "n_iter": 5,
         "n_jobs": 1,
     }
-    fit_params = {"classifier__epochs": 15, "classifier__batch_size": 30,
+    fit_params = {"classifier__epochs": 25, "classifier__batch_size": 30,
                   'classifier__verbose': 1, "classifier__class_weight": {"0": 0.84, "1": 1.14}}
     model_init_params = {"input_shape": (20, 1800, 7)}
     scaler_name = "3D-standard"
@@ -252,7 +252,7 @@ def lstm():
         # dict(name="UniformIntegerHyperparameter",
         #      kwargs=dict(name="classifier__lstm2_units", lower=8, upper=128, log=False)),
         dict(name="UniformFloatHyperparameter",
-             kwargs=dict(name="classifier__dropout_rate", lower=0.3, upper=.5, log=False)),
+             kwargs=dict(name="classifier__dropout_rate", lower=0.4, upper=.9, log=False)),
         dict(name="UniformIntegerHyperparameter",  # inclusive interval
              kwargs=dict(name="classifier__num_lstm_layers", lower=1, upper=3, log=False)),
         dict(name="UniformFloatHyperparameter",
@@ -305,6 +305,12 @@ def parse_model_name(model_name: str, model_init_params={}):
         model = KerasClassifier(build_fn=model_fn)
     elif model_name == "CNN":
         def model_fn(kernel_size, stride, num_filters, num_conv_layers, pooling, dropout_rate):
+            dropout_rate = 0.7956046053902401
+            kernel_size = 5,
+            num_conv_layers = 2
+            num_filters = 63
+            pooling = "max"
+            stride = 5
             return build_cnn_model(kernel_size=kernel_size, stride=stride,
                                    num_filters=num_filters, num_conv_layers=num_conv_layers,
                                    pooling=pooling, dropout_rate=dropout_rate,
@@ -313,6 +319,9 @@ def parse_model_name(model_name: str, model_init_params={}):
         model = KerasClassifier(build_fn=model_fn)
     elif model_name == "LSTM":
         def model_fn(lstm_units, dropout_rate, num_lstm_layers, learning_rate):
+            lstm_units = 82
+            learning_rate = 0.002
+            num_lstm_layers = 1
             return build_lstm_model(lstm_units=lstm_units,
                                     dropout_rate=dropout_rate, num_lstm_layers=num_lstm_layers,
                                     learning_rate=learning_rate,
