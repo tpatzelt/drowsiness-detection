@@ -422,8 +422,8 @@ def save_best_model(estimator):
 
 def parse_fit_params(fit_params):
     class_weights = fit_params.get("classifier__class_weight", None)
+    new_fit_params = fit_params.copy()
     if class_weights:
-        new_fit_params = fit_params.copy()
         new_fit_params["classifier__class_weight"] = {int(key): value for key, value in
                                                       class_weights.items()}
     return new_fit_params
