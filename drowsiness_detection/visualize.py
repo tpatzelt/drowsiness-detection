@@ -15,9 +15,8 @@ from sklearn.model_selection import StratifiedKFold, RandomizedSearchCV, GridSea
 
 from drowsiness_detection import config
 from drowsiness_detection.data import get_session_idx, get_subject_idx
+from drowsiness_detection.data import (label_names_dict)
 from drowsiness_detection.data import (load_experiment_objects, load_experiment_objects_nn)
-from drowsiness_detection.data import (load_preprocessed_train_test_splits,
-                                       session_type_mapping, label_names_dict)
 from drowsiness_detection.run_grid_search_experiment import load_experiment_data, parse_scaler_name
 
 
@@ -343,15 +342,22 @@ def plot_roc_curve_from_log_dir(experiment_id=21, plot_train_roc: bool = False, 
     config.set_paths(30, window_size)
 
     # load data
-    X_train, X_test, y_train, y_test, _ = load_preprocessed_train_test_splits(
-        data_path=config.PATHS.WINDOW_FEATURES,
-        exclude_sess_type=session_type_mapping[exp_config["exclude_by"]],
+    X_train, X_test, y_train, y_test, _ = load_experiment_data(
+        exclude_by=exp_config["exclude_by"],
         num_targets=exp_config["num_targets"],
         seed=exp_config["seed"],
         test_size=exp_config["test_size"],
-        split_by_subjects=exp_config["split_by_subjects"])
+        split_by_subjects=exp_config["split_by_subjects"],
+        use_dummy_data=exp_config["use_dummy_data"],
+        nn_experiment=exp_config["nn_experiment"],
+        feature_col_indices=exp_config["feature_col_indices"],
+        model_name=exp_config["model_name"])
 
     print(f"ID {experiment_id}")
+    scaler = parse_scaler_name(exp_config["scaler_name"], exp_config.get("scaler_params", {}))
+    X_train = scaler.fit_transform(X_train, y_train)
+    X_test = scaler.transform(X_test)
+    print("mean-prediction", np.mean(best_estimator.predict(X_test)))
     RocCurveDisplay.from_estimator(estimator=best_estimator, X=X_test, y=y_test,
                                    name=f"RF-{window_size}s" + ("(test)" if plot_train_roc else ""),
                                    ax=ax, pos_label=pos_label)
@@ -382,12 +388,17 @@ def plot_learning_curve_from_log_dir(experiment_id, n_estimator_options, ax=None
     window_size = exp_config["window_in_sec"]
     config.set_paths(30, window_size)
 
-    X_train, X_test, y_train, y_test, _ = load_preprocessed_train_test_splits(
-        data_path=config.PATHS.WINDOW_FEATURES,
-        exclude_sess_type=session_type_mapping[exp_config["exclude_by"]],
+    # load data
+    X_train, X_test, y_train, y_test, _ = load_experiment_data(
+        exclude_by=exp_config["exclude_by"],
         num_targets=exp_config["num_targets"],
         seed=exp_config["seed"],
-        test_size=exp_config["test_size"])
+        test_size=exp_config["test_size"],
+        split_by_subjects=exp_config["split_by_subjects"],
+        use_dummy_data=exp_config["use_dummy_data"],
+        nn_experiment=exp_config["nn_experiment"],
+        feature_col_indices=exp_config["feature_col_indices"],
+        model_name=exp_config["model_name"])
 
     from sklearn.utils.class_weight import compute_class_weight
     num_samples = -1  # for debugging
@@ -567,6 +578,7 @@ def plot_roc_curve_from_log_dir_nn(experiment_id, plot_train_roc: bool = False, 
     X_test = scaler.transform(X_test)
     y_pred_test = best_estimator.predict(X_test)
     y_pred_train = best_estimator.predict(X_train)
+    print("mean-prediction", np.mean(y_pred_test))
 
     RocCurveDisplay.from_predictions(y_test, y_pred_test,
                                      name=f"{window_size}s" + ("(test)" if plot_train_roc else ""),
