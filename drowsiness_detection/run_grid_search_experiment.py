@@ -51,7 +51,7 @@ def base():
         "n_jobs": -1,
         "error_score": 0,
         "verbose": 1,
-        "refit": True,
+        "refit": False,
         # "return_train_score": True
 
     }
@@ -460,19 +460,28 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     search = init_model_selection(model_selection_name, estimator=pipe,
                                   param_distribution=param_distribution, cv=cv,
                                   grid_search_params=grid_search_params, seed=seed)
-    # add fit params to log scores while training
-    if nn_experiment and model_name != "MINIROCKET":
-        fit_params = add_callbacks_to_fit_params(fit_params=fit_params,
-                                                 validation_data=(X_test, y_test))
     print("starting hyperparameter search")
     search.fit(X=X_train, y=y_train, **fit_params)
     print("finished finding the best hyperparameters")
     # log scores of best model
     save_search_results(search=search)
-    save_best_model(estimator=search.best_estimator_)
-    # log metrics on test and train set explicitly and redundantly
+    best_params = search.best_params_.copy()
+    del search
+
+    # initialize estimator with best params and retrain on complete dataset
+    if nn_experiment and model_name != "MINIROCKET":
+        fit_params = add_callbacks_to_fit_params(fit_params=fit_params,
+                                                 validation_data=(X_test, y_test))
+    # train model on entire dataset
+    print("start training best model on complete training and validation data")
+    new_pipe: Pipeline = pipe.set_params(**best_params)  # noqa
+    new_pipe.fit(X=X_train, y=y_train, **fit_params)
+
+    # log metrics on test and train set
     print("log scores and training and test set")
-    log_train_and_test_score(estimator=search.best_estimator_,
-                             scoring=grid_search_params["scoring"],
+    log_train_and_test_score(estimator=new_pipe, scoring=grid_search_params["scoring"],
                              X_train=X_train, X_test=X_test,
                              y_train=y_train, y_test=y_test)
+
+    # save best model instance
+    save_best_model(estimator=new_pipe)
