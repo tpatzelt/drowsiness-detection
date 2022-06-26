@@ -333,11 +333,12 @@ def plot_search_results(grid):
 
 
 def plot_roc_curve_from_log_dir(experiment_id=21, plot_train_roc: bool = False, ax=None,
-                                pos_label=1):
+                                pos_label=1, log_dir="../../logs/"):
     if ax is None:
         fig, ax = plt.subplots()
 
-    exp_config, best_estimator, _ = load_experiment_objects(experiment_id=experiment_id)
+    exp_config, best_estimator, _ = load_experiment_objects(experiment_id=experiment_id,
+                                                            log_dir=log_dir)
     window_size = exp_config["window_in_sec"]
     config.set_paths(30, window_size)
 
@@ -572,7 +573,6 @@ def plot_roc_curve_from_log_dir_nn(experiment_id, plot_train_roc: bool = False, 
         RocCurveDisplay.from_estimator(y_train, y_pred_train,
                                        name=f"{window_size}s(train)", ax=ax, pos_label=pos_label)
 
-    y_pred_train = y_pred_train > .5
     y_pred_test = y_pred_test > .5
     report = classification_report(y_true=y_test, y_pred=y_pred_test,
                                    target_names=label_names_dict[exp_config["num_targets"]])
