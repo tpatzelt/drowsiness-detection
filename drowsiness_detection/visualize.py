@@ -488,7 +488,9 @@ def plot_cv_test_train_scores_as_scatter(search_results, model_type="lstm"):
     points2 = []
     param_dicts = []
     for index, row in df.sort_values(by=["rank_test_score"]).iloc[:len(colors)].iterrows():
-        param_dict = {param.replace("param_classifier__", ""): value for param, value in
+        param_dict = {param.replace("param_classifier__", ""): round(value, 5) if isinstance(value,
+                                                                                             float) else value
+                      for param, value in
                       row.iteritems() if "param" in param}
         param_dicts.append(param_dict)
         train_score = row["mean_train_score"]

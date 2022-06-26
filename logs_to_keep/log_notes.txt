@@ -7,4 +7,6 @@
 102 lstm but with nan loss
 103 cnn but overfitted with one candidate
 105 minirocket full dataset different alphas
+107 lstm full dataset different hyperparameters which lower lr
 109 CNN with two candidates
+110 minirocket full dataset with larger alphas
