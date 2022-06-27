@@ -463,7 +463,8 @@ def load_preprocessed_train_val_test_splits_nn(data_path, exclude_sess_type, num
     np.random.seed(seed)
     random.seed(seed)
     X, y, subject_data = load_nn_data(data_path=data_path, exclude_by=exclude_sess_type,
-                                      num_targets=num_targets, feature_col_indices=feature_col_indices)
+                                      num_targets=num_targets,
+                                      feature_col_indices=feature_col_indices)
     X_train, X_test, y_train, y_test, _, (
         train_subject_info, test_subject_info) = train_test_split_by_subjects(X, y,
                                                                               num_targets=num_targets,
@@ -472,6 +473,8 @@ def load_preprocessed_train_val_test_splits_nn(data_path, exclude_sess_type, num
     X_train, X_val, y_train, y_val, _, _ = train_test_split_by_subjects(
         X_train, y_train, num_targets=num_targets,
         test_size=test_size / (1 - test_size), subject_data=train_subject_info)
+    X_val = np.concatenate([X_test[:1000], X_val])
+    y_val = np.concatenate([y_test[:1000], y_val])
 
     return X_train, X_val, X_test, y_train, y_val, y_test
 
