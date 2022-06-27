@@ -204,10 +204,10 @@ def cnn():
     grid_search_params = {
         "scoring": "accuracy",
         "return_train_score": True,
-        "n_iter": 1,
+        "n_iter": 10,
         "n_jobs": 1,
     }
-    fit_params = {"classifier__epochs": 100, "classifier__batch_size": 20,
+    fit_params = {"classifier__epochs": 3, "classifier__batch_size": 20,
                   'classifier__verbose': 0, "classifier__class_weight": {"0": 0.84, "1": 1.14}}
     model_init_params = {"input_shape": (20, 1800, 7)}
     scaler_name = "3D-standard"
@@ -219,13 +219,15 @@ def cnn():
         dict(name="CategoricalHyperparameter",
              kwargs=dict(name="classifier__kernel_size", choices=[3, 5])),
         dict(name="CategoricalHyperparameter",
-             kwargs=dict(name="classifier__stride", choices=[3, 5])),
+             kwargs=dict(name="classifier__stride", choices=[1, 3, 5])),
         dict(name="CategoricalHyperparameter",
              kwargs=dict(name="classifier__pooling", choices=["average", "max"])),
         dict(name="UniformIntegerHyperparameter",
-             kwargs=dict(name="classifier__num_conv_layers", lower=1, upper=2, log=False)),
+             kwargs=dict(name="classifier__num_conv_layers", lower=1, upper=3, log=False)),
         dict(name="UniformFloatHyperparameter",
-             kwargs=dict(name="classifier__dropout_rate", lower=0.4, upper=.8, log=False)),
+             kwargs=dict(name="classifier__dropout_rate", lower=0.5, upper=.9, log=False)),
+        dict(name="UniformFloatHyperparameter",
+             kwargs=dict(name="classifier__learning_rate", lower=0.002, upper=0.05, log=True)),
     ]
     feature_col_indices = (5, 8, 9, 14, 15, 16, 19)
 
@@ -304,16 +306,18 @@ def parse_model_name(model_name: str, model_init_params={}):
 
         model = KerasClassifier(build_fn=model_fn)
     elif model_name == "CNN":
-        def model_fn(kernel_size, stride, num_filters, num_conv_layers, pooling, dropout_rate):
-            dropout_rate = 0.7956046053902401
-            kernel_size = 5,
-            num_conv_layers = 2
-            num_filters = 63
-            pooling = "max"
-            stride = 5
+        def model_fn(kernel_size, stride, num_filters, num_conv_layers, pooling, dropout_rate,
+                     learning_rate):
+            # dropout_rate = 0.7956046053902401
+            # kernel_size = 5,
+            # num_conv_layers = 2
+            # num_filters = 63
+            # pooling = "max"
+            # stride = 5
             return build_cnn_model(kernel_size=kernel_size, stride=stride,
                                    num_filters=num_filters, num_conv_layers=num_conv_layers,
                                    pooling=pooling, dropout_rate=dropout_rate,
+                                   learning_rate=learning_rate,
                                    **model_init_params)
 
         model = KerasClassifier(build_fn=model_fn)
