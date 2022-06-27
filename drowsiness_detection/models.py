@@ -61,9 +61,8 @@ def build_cnn_model(input_shape,
                     num_conv_layers=2,
                     padding="same",
                     use_batch_norm=True,
-                    lr=0.01,
                     pooling="average",
-                    dropout_rate=.2):
+                    dropout_rate=.2, learning_rate=.002):
     input_layer = keras.layers.Input(input_shape[1:])
     prev_layer = input_layer
     for _ in range(num_conv_layers):
@@ -87,7 +86,7 @@ def build_cnn_model(input_shape,
     output_layer = keras.layers.Dense(1, activation="sigmoid")(dropout_layer)
 
     model = keras.models.Model(inputs=input_layer, outputs=output_layer)
-    optimizer = keras.optimizers.Adam(learning_rate=lr)
+    optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
     model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
     print(model.summary())
     return model
