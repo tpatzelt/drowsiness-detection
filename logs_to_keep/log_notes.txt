@@ -10,3 +10,15 @@
 107 lstm full dataset different hyperparameters which lower lr
 109 CNN with two candidates
 110 minirocket full dataset with larger alphas
+116 cnn 100 epochs with fixed params balanced
+117 minirocket 5 candidates
+118 cnn 10 candidates 3 epochs balanced
+119 minirocket balancedd class weights 5 candidates
+120 lstm 5 candidates balanced
+
+
+best models:
+random forest: 16
+cnn: 118
+lstm: 120
+minirocket: 117
