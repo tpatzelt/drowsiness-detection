@@ -281,6 +281,8 @@ def minirocket():
     hyperparameter_specs = [
         dict(name="UniformFloatHyperparameter",
              kwargs=dict(name="classifier__alpha", lower=0.1, upper=100, log=True)),
+        dict(name="UniformIntegerHyperparameter",
+             kwargs=dict(name="minirocket__num_kernels", lower=10000, upper=20000)),
         dict(name="CategoricalHyperparameter",
              kwargs=dict(name="classifier__class_weight", choices=["balanced"])),
     ]
