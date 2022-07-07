@@ -1,0 +1,123 @@
+{
+  "artifacts": [
+    "search_result.pkl",
+    "best_model.pkl"
+  ],
+  "command": "run",
+  "experiment": {
+    "base_dir": "/home/tim/PycharmProjects/drowsiness-detection/drowsiness_detection",
+    "dependencies": [
+      "daal4py==2021.5.3",
+      "dill==0.3.5.1",
+      "keras==2.6.0",
+      "munch==2.5.0",
+      "numpy==1.21.6",
+      "sacred==0.8.2",
+      "scikit-learn==1.0.2",
+      "scikit-learn-intelex==2021.5.3",
+      "sktime==0.12.0",
+      "tensorflow==2.6.0"
+    ],
+    "mainfile": "run_grid_search_experiment.py",
+    "name": "grid_search_kss",
+    "repositories": [
+      {
+        "commit": "bcb7c7e724d363a7511ba3d87101b9068ec0e2d9",
+        "dirty": true,
+        "url": "https://github.com/tpatzelt/drowsiness-detection.git"
+      },
+      {
+        "commit": "bcb7c7e724d363a7511ba3d87101b9068ec0e2d9",
+        "dirty": true,
+        "url": "https://github.com/tpatzelt/drowsiness-detection.git"
+      },
+      {
+        "commit": "bcb7c7e724d363a7511ba3d87101b9068ec0e2d9",
+        "dirty": true,
+        "url": "https://github.com/tpatzelt/drowsiness-detection.git"
+      },
+      {
+        "commit": "bcb7c7e724d363a7511ba3d87101b9068ec0e2d9",
+        "dirty": true,
+        "url": "https://github.com/tpatzelt/drowsiness-detection.git"
+      },
+      {
+        "commit": "bcb7c7e724d363a7511ba3d87101b9068ec0e2d9",
+        "dirty": true,
+        "url": "https://github.com/tpatzelt/drowsiness-detection.git"
+      }
+    ],
+    "sources": [
+      [
+        "config.py",
+        "_sources/config_e2f7410ed22e467e372f969106d7b1f2.py"
+      ],
+      [
+        "data.py",
+        "_sources/data_89e257e95c543ed92d17ae00cdd79c55.py"
+      ],
+      [
+        "helpers.py",
+        "_sources/helpers_0be979200f0f01de5b5ccdfb7f488138.py"
+      ],
+      [
+        "models.py",
+        "_sources/models_90fdbdb3796c823e61aa7349c071a9a8.py"
+      ],
+      [
+        "run_grid_search_experiment.py",
+        "_sources/run_grid_search_experiment_568cfb1ca511ac399034bf1b825ad6fa.py"
+      ]
+    ]
+  },
+  "heartbeat": "2022-06-27T09:04:01.996563",
+  "host": {
+    "ENV": {},
+    "cpu": "Intel(R) Core(TM) i7-6700 CPU @ 3.40GHz",
+    "hostname": "hp",
+    "os": [
+      "Linux",
+      "Linux-5.4.0-120-generic-x86_64-with-glibc2.27"
+    ],
+    "python_version": "3.9.13"
+  },
+  "meta": {
+    "command": "run",
+    "options": {
+      "--beat-interval": null,
+      "--capture": null,
+      "--comment": null,
+      "--debug": false,
+      "--enforce_clean": false,
+      "--file_storage": null,
+      "--force": false,
+      "--help": false,
+      "--loglevel": null,
+      "--mongo_db": null,
+      "--name": null,
+      "--pdb": false,
+      "--print-config": false,
+      "--priority": null,
+      "--queue": false,
+      "--s3": null,
+      "--sql": null,
+      "--tiny_db": null,
+      "--unobserved": false,
+      "COMMAND": null,
+      "UPDATE": [
+        "minirocket",
+        "recording_frequency=30",
+        "window_in_sec=60",
+        "num_targets=2",
+        "seed=45"
+      ],
+      "help": false,
+      "with": true
+    }
+  },
+  "resources": [],
+  "result": null,
+  "start_time": "2022-06-27T06:50:42.653121",
+  "status": "COMPLETED",
+  "stop_time": "2022-06-27T09:04:01.995860"
+}

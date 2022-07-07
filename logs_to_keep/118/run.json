@@ -1,0 +1,122 @@
+{
+  "artifacts": [
+    "search_result.pkl"
+  ],
+  "command": "run",
+  "experiment": {
+    "base_dir": "/home/tim/PycharmProjects/drowsiness-detection/drowsiness_detection",
+    "dependencies": [
+      "daal4py==2021.5.3",
+      "dill==0.3.5.1",
+      "keras==2.6.0",
+      "munch==2.5.0",
+      "numpy==1.21.6",
+      "sacred==0.8.2",
+      "scikit-learn==1.0.2",
+      "scikit-learn-intelex==2021.5.3",
+      "sktime==0.12.0",
+      "tensorflow==2.6.0"
+    ],
+    "mainfile": "run_grid_search_experiment.py",
+    "name": "grid_search_kss",
+    "repositories": [
+      {
+        "commit": "eb9fd46f0bb80822cd2ad8b3f7887a5d5a5d736d",
+        "dirty": true,
+        "url": "https://github.com/tpatzelt/drowsiness-detection.git"
+      },
+      {
+        "commit": "eb9fd46f0bb80822cd2ad8b3f7887a5d5a5d736d",
+        "dirty": true,
+        "url": "https://github.com/tpatzelt/drowsiness-detection.git"
+      },
+      {
+        "commit": "eb9fd46f0bb80822cd2ad8b3f7887a5d5a5d736d",
+        "dirty": true,
+        "url": "https://github.com/tpatzelt/drowsiness-detection.git"
+      },
+      {
+        "commit": "eb9fd46f0bb80822cd2ad8b3f7887a5d5a5d736d",
+        "dirty": true,
+        "url": "https://github.com/tpatzelt/drowsiness-detection.git"
+      },
+      {
+        "commit": "eb9fd46f0bb80822cd2ad8b3f7887a5d5a5d736d",
+        "dirty": true,
+        "url": "https://github.com/tpatzelt/drowsiness-detection.git"
+      }
+    ],
+    "sources": [
+      [
+        "config.py",
+        "_sources/config_e2f7410ed22e467e372f969106d7b1f2.py"
+      ],
+      [
+        "data.py",
+        "_sources/data_c9bef77da65703fa04bc2846382c264b.py"
+      ],
+      [
+        "helpers.py",
+        "_sources/helpers_0be979200f0f01de5b5ccdfb7f488138.py"
+      ],
+      [
+        "models.py",
+        "_sources/models_42f6cb8a51bd13ba06ed35842af0b487.py"
+      ],
+      [
+        "run_grid_search_experiment.py",
+        "_sources/run_grid_search_experiment_4acd7306b02e8aa49d028f1ec4cea683.py"
+      ]
+    ]
+  },
+  "heartbeat": "2022-06-27T16:24:04.018367",
+  "host": {
+    "ENV": {},
+    "cpu": "Intel(R) Core(TM) i7-6700 CPU @ 3.40GHz",
+    "hostname": "hp",
+    "os": [
+      "Linux",
+      "Linux-5.4.0-120-generic-x86_64-with-glibc2.27"
+    ],
+    "python_version": "3.9.13"
+  },
+  "meta": {
+    "command": "run",
+    "options": {
+      "--beat-interval": null,
+      "--capture": null,
+      "--comment": null,
+      "--debug": false,
+      "--enforce_clean": false,
+      "--file_storage": null,
+      "--force": false,
+      "--help": false,
+      "--loglevel": null,
+      "--mongo_db": null,
+      "--name": null,
+      "--pdb": false,
+      "--print-config": false,
+      "--priority": null,
+      "--queue": false,
+      "--s3": null,
+      "--sql": null,
+      "--tiny_db": null,
+      "--unobserved": false,
+      "COMMAND": null,
+      "UPDATE": [
+        "cnn",
+        "recording_frequency=30",
+        "window_in_sec=60",
+        "num_targets=2",
+        "seed=45"
+      ],
+      "help": false,
+      "with": true
+    }
+  },
+  "resources": [],
+  "result": null,
+  "start_time": "2022-06-27T16:11:41.555113",
+  "status": "COMPLETED",
+  "stop_time": "2022-06-27T16:24:04.017666"
+}

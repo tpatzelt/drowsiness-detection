@@ -1,0 +1,12 @@
+{
+  "best_cv_test_accuracy": 0.6974037600716204,
+  "best_cv_train_accuracy": 0.778621898740902,
+  "best_params": {
+    "classifier__dropout_rate": 0.8953608423789001,
+    "classifier__learning_rate": 0.0018597842328183852,
+    "classifier__lstm_units": 82,
+    "classifier__num_lstm_layers": 1
+  },
+  "test_accuracy": 0.5506621599197388,
+  "train_accuracy": 0.6851587891578674
+}
