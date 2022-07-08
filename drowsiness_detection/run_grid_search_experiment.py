@@ -204,10 +204,10 @@ def cnn():
     grid_search_params = {
         "scoring": "accuracy",
         "return_train_score": True,
-        "n_iter": 10,
+        "n_iter": 1,
         "n_jobs": 1,
     }
-    fit_params = {"classifier__epochs": 3, "classifier__batch_size": 20,
+    fit_params = {"classifier__epochs": 150, "classifier__batch_size": 20,
                   'classifier__verbose': 0, "classifier__class_weight": {"0": 0.84, "1": 1.14}}
     model_init_params = {"input_shape": (20, 1800, 7)}
     scaler_name = "3D-standard"
@@ -280,9 +280,9 @@ def minirocket():
     scaler_params = {"feature_axis": 1}
     hyperparameter_specs = [
         dict(name="UniformFloatHyperparameter",
-             kwargs=dict(name="classifier__alpha", lower=0.1, upper=100, log=True)),
+             kwargs=dict(name="classifier__alpha", lower=2, upper=150)),
         dict(name="UniformIntegerHyperparameter",
-             kwargs=dict(name="minirocket__num_kernels", lower=10000, upper=20000)),
+             kwargs=dict(name="minirocket__num_kernels", lower=10000, upper=10001)),
         dict(name="CategoricalHyperparameter",
              kwargs=dict(name="classifier__class_weight", choices=["balanced"])),
     ]
@@ -310,12 +310,13 @@ def parse_model_name(model_name: str, model_init_params={}):
     elif model_name == "CNN":
         def model_fn(kernel_size, stride, num_filters, num_conv_layers, pooling, dropout_rate,
                      learning_rate):
-            # dropout_rate = 0.7956046053902401
-            # kernel_size = 5,
-            # num_conv_layers = 2
-            # num_filters = 63
-            # pooling = "max"
-            # stride = 5
+            dropout_rate = 0.725
+            kernel_size = 5
+            num_conv_layers = 2
+            num_filters = 44
+            pooling = "max"
+            stride = 3
+            learning_rate = 0.009
             return build_cnn_model(kernel_size=kernel_size, stride=stride,
                                    num_filters=num_filters, num_conv_layers=num_conv_layers,
                                    pooling=pooling, dropout_rate=dropout_rate,
