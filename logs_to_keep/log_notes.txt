@@ -13,8 +13,10 @@
 116 cnn 100 epochs with fixed params balanced
 117 minirocket 5 candidates
 118 cnn 10 candidates 3 epochs balanced
-119 minirocket balancedd class weights 5 candidates
+119 minirocket balanced class weights 5 candidates
 120 lstm 5 candidates balanced
+121 cnn fixed params 150 epochs
+122 minirocket 5 candidates, large alphas
 
 
 best models:
