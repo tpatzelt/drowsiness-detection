@@ -21,6 +21,6 @@
 
 best models:
 random forest: 16
-cnn: 118
+cnn: 121
 lstm: 120
-minirocket: 117
+minirocket: 122
