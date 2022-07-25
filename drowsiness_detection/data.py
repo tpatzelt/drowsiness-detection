@@ -1,6 +1,7 @@
 import json
 import random
 from csv import DictReader
+from dataclasses import dataclass
 from pathlib import Path
 from random import choice
 from typing import Tuple, Union
@@ -258,7 +259,8 @@ def get_data_for_nn(data_path: Path = config.PATHS.WINDOW_DATA):
         yield features, targets, sess_types, subject_ids
 
 
-def preprocess_data_for_nn(data_generator, exclude_sess_type: int, num_targets: int, feature_col_indices: Tuple):
+def preprocess_data_for_nn(data_generator, exclude_sess_type: int, num_targets: int,
+                           feature_col_indices: Tuple):
     for feature_data, targets, session_types, subject_ids in data_generator:
         targets = discretize_labels_by_threshold(targets=targets, num_targets=num_targets)
         feature_data = np.nan_to_num(feature_data)
@@ -270,12 +272,13 @@ def preprocess_data_for_nn(data_generator, exclude_sess_type: int, num_targets: 
         subject_ids = subject_ids[session_mask]
         # print(f"{feature_data.shape} vs {targets.shape}")
         # only use certain feature columns
-        feature_data = feature_data[:,:,feature_col_indices]
+        feature_data = feature_data[:, :, feature_col_indices]
         if feature_data.shape[0] != targets.shape[0]:
             raise ValueError(f"{feature_data.shape} vs {targets.shape}")
         if feature_data.size == 0:
             continue
-        yield feature_data.astype(np.float32), targets.astype(int), np.c_[session_types, subject_ids]
+        yield feature_data.astype(np.float32), targets.astype(int), np.c_[
+            session_types, subject_ids]
 
 
 # %%
@@ -302,10 +305,11 @@ def merge_nn_data(data_generator):
 
 
 def load_nn_data(exclude_by: int = 1, data_path: Path = config.PATHS.WINDOW_DATA,
-                 num_targets: int = 2, feature_col_indices: Tuple = (5,8,9,14,15,16,19)):
+                 num_targets: int = 2, feature_col_indices: Tuple = (5, 8, 9, 14, 15, 16, 19)):
     data_gen = get_data_for_nn(data_path=data_path)
     data_gen = preprocess_data_for_nn(data_generator=data_gen, exclude_sess_type=exclude_by,
-                                      num_targets=num_targets, feature_col_indices=feature_col_indices)
+                                      num_targets=num_targets,
+                                      feature_col_indices=feature_col_indices)
     return merge_nn_data(data_generator=data_gen)
 
 
@@ -417,7 +421,7 @@ def train_test_split_by_subjects(X, y, num_targets, test_size, subject_data):
     assert (len(test) == len(test_labels))
     return train, test, train_labels, test_labels, (
         np.array(train_ids).astype(int), np.array(test_ids).astype(int)), (
-           train_subject_info, test_subject_info)
+        train_subject_info, test_subject_info)
 
 
 def load_preprocessed_train_test_splits(data_path, exclude_sess_type, num_targets, seed, test_size,
@@ -431,31 +435,33 @@ def load_preprocessed_train_test_splits(data_path, exclude_sess_type, num_target
                                                  exclude_sess_type=exclude_sess_type,
                                                  num_targets=num_targets)
     if split_by_subjects:
-        X_train, X_test, y_train, y_test, _, (
+        X_train, X_test, y_train, y_test, (train_ids, test_ids), (
             train_subject_info, test_subject_info) = train_test_split_by_subjects(X, y,
                                                                                   num_targets=num_targets,
                                                                                   test_size=test_size,
                                                                                   subject_data=subject_data)
         # print(f"X_train shape: {X_train.shape}, y_train shape: {y_train.shape}")
         # print(f"X_test shape: {X_test.shape}, y_test shape: {y_test.shape}")
-        return X_train, X_test, y_train, y_test, (train_subject_info, test_subject_info)
+        return X_train, X_test, y_train, y_test, (train_ids, test_ids), (
+            train_subject_info, test_subject_info)
     else:
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
                                                             random_state=seed)
-        return X_train, X_test, y_train, y_test, None
+        return X_train, X_test, y_train, y_test, None, None
 
 
 def load_preprocessed_train_val_test_splits(data_path, exclude_sess_type, num_targets, seed,
                                             test_size, split_by_subjects: int = True):
-    X_train, X_test, y_train, y_test, (
-    train_subject_info, test_subject_info) = load_preprocessed_train_test_splits(
+    X_train, X_test, y_train, y_test, (train_ids, test_ids), (
+        train_subject_info, test_subject_info) = load_preprocessed_train_test_splits(
         data_path, exclude_sess_type, num_targets, seed, test_size, split_by_subjects)
-    X_train, X_val, y_train, y_val, _, _ = train_test_split_by_subjects(X_train, y_train,
-                                                                        num_targets=num_targets,
-                                                                        test_size=test_size / (
-                                                                                    1 - test_size),
-                                                                        subject_data=train_subject_info)
-    return X_train, X_val, X_test, y_train, y_val, y_test
+    X_train, X_val, y_train, y_val, (train_ids, val_ids), (
+        train_subject_info, test_subject_info) = train_test_split_by_subjects(X_train, y_train,
+                                                                              num_targets=num_targets,
+                                                                              test_size=test_size / (
+                                                                                      1 - test_size),
+                                                                              subject_data=train_subject_info)
+    return X_train, X_val, X_test, y_train, y_val, y_test, (train_ids, val_ids, test_ids)
 
 
 def load_preprocessed_train_val_test_splits_nn(data_path, exclude_sess_type, num_targets,
@@ -518,7 +524,44 @@ def load_experiment_data(feature_col_indices, seed,
         X_train, X_test = map(lambda X: np.swapaxes(X, 1, 2), (X_train, X_test))
     print(f"X_train shape: {X_train.shape}, y_train shape: {y_train.shape}")
     print(f"X_test shape: {X_test.shape}, y_test shape: {y_test.shape}")
-    return X_train, X_test, y_train, y_test, split_idx
+    return X_train, X_test, y_train, y_test,
+
+
+@dataclass
+class Data:
+    X_train: np.ndarray
+    X_test: np.ndarray
+    y_train: np.ndarray
+    y_test: np.ndarray
+    X_val: np.ndarray = None
+    y_val: np.ndarray = None
+
+
+def load_raw_60_sec_data(path=None):
+    """ generated with seed 42"""
+    if path is None:
+        path = config.SOURCES_ROOT_PATH.parent.joinpath("data/preprocessed/60sec/raw_features")
+    X_train = np.load(str(path.joinpath("X_train.npy")))
+    X_val = np.load(str(path.joinpath("X_val.npy")))
+    X_test = np.load(str(path.joinpath("X_test.npy")))
+    y_train = np.load(str(path.joinpath("y_train.npy")))
+    y_val = np.load(str(path.joinpath("y_val.npy")))
+    y_test = np.load(str(path.joinpath("y_test.npy")))
+    return Data(X_train, X_test, y_train, y_test, X_val, y_val)
+
+
+def load_engineered_60_sec_data(path=None):
+    """ generated with seed 42"""
+    if path is None:
+        path = config.SOURCES_ROOT_PATH.parent.joinpath(
+            "data/preprocessed/60sec/engineered_features")
+    X_train = np.load(str(path.joinpath("X_train.npy")))
+    X_val = np.load(str(path.joinpath("X_val.npy")))
+    X_test = np.load(str(path.joinpath("X_test.npy")))
+    y_train = np.load(str(path.joinpath("y_train.npy")))
+    y_val = np.load(str(path.joinpath("y_val.npy")))
+    y_test = np.load(str(path.joinpath("y_test.npy")))
+    return Data(X_train, X_test, y_train, y_test, X_val, y_val)
 
 
 if __name__ == '__main__':
