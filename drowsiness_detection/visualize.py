@@ -349,9 +349,9 @@ def plot_roc_curve_from_log_dir(experiment_id=21, plot_train_roc: bool = False, 
         test_size=exp_config["test_size"],
         split_by_subjects=exp_config["split_by_subjects"],
         use_dummy_data=exp_config["use_dummy_data"],
-        nn_experiment=exp_config["nn_experiment"],
-        feature_col_indices=exp_config["feature_col_indices"],
-        model_name=exp_config["model_name"])
+        nn_experiment=exp_config.get("nn_experiment", False),
+        feature_col_indices=exp_config.get("feature_col_indices", None),
+        model_name=exp_config.get("model_name", None))
 
     print(f"ID {experiment_id}")
     scaler = parse_scaler_name(exp_config["scaler_name"], exp_config.get("scaler_params", {}))
