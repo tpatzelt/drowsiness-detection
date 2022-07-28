@@ -1,6 +1,9 @@
 from pathlib import Path
 
 SOURCES_ROOT_PATH = Path(__file__).parent
+DATA_DIR_PATH = SOURCES_ROOT_PATH.parent.joinpath("data")
+MODEL_DIR_PATH = DATA_DIR_PATH.joinpath("models/60sec")
+PREDICTION_DIR_PATH = DATA_DIR_PATH.joinpath("predictions/60sec")
 
 BASE_PATH = Path("/home/tim/Windows")
 # BASE_PATH = Path("/media/tim/My Passport/drowsiness_data/Windows")
