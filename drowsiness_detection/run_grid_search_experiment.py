@@ -1,31 +1,34 @@
-from sklearnex import patch_sklearn
+# from sklearnex import patch_sklearn
+#
+# patch_sklearn()
+import os
+from pathlib import Path
+from typing import Tuple
 
-patch_sklearn()
+import dill as pickle
+import numpy as np
+import tensorflow as tf
+from keras.wrappers.scikit_learn import KerasClassifier
+from sacred import Experiment
 from sacred import SETTINGS
+from sacred.observers import FileStorageObserver
+from sklearn.dummy import DummyClassifier
+from sklearn.ensemble import RandomForestClassifier
 # explicitly require this experimental feature
 from sklearn.experimental import enable_halving_search_cv  # noqa
+from sklearn.linear_model import LogisticRegression, RidgeClassifier
 # now you can import normally from model_selection
 from sklearn.model_selection import HalvingRandomSearchCV, RandomizedSearchCV, GridSearchCV, \
     PredefinedSplit
-from typing import Tuple
-from sktime.transformations.panel.rocket import MiniRocketMultivariate
 from sklearn.pipeline import Pipeline
-from keras.wrappers.scikit_learn import KerasClassifier
-import dill as pickle
-from drowsiness_detection.data import (load_experiment_data)
-from drowsiness_detection.helpers import spec_to_config_space
-from sklearn.dummy import DummyClassifier
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
-from pathlib import Path
-from sacred import Experiment
-from sacred.observers import FileStorageObserver
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression, RidgeClassifier
+from sktime.transformations.panel.rocket import MiniRocketMultivariate
+
 from drowsiness_detection import config
+from drowsiness_detection.data import (load_raw_60_sec_data)
+from drowsiness_detection.helpers import spec_to_config_space
 from drowsiness_detection.models import build_dummy_tf_classifier, ThreeDStandardScaler, \
     build_dense_model, build_lstm_model, build_cnn_model
-import tensorflow as tf
-import os
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
@@ -204,7 +207,7 @@ def cnn():
     grid_search_params = {
         "scoring": "accuracy",
         "return_train_score": True,
-        "n_iter": 1,
+        "n_iter": 40,
         "n_jobs": 1,
     }
     fit_params = {"classifier__epochs": 150, "classifier__batch_size": 20,
@@ -240,7 +243,7 @@ def lstm():
     grid_search_params = {
         "scoring": "accuracy",
         "return_train_score": True,
-        "n_iter": 5,
+        "n_iter": 20,
         "n_jobs": 1,
     }
     fit_params = {"classifier__epochs": 25, "classifier__batch_size": 30,
@@ -310,13 +313,13 @@ def parse_model_name(model_name: str, model_init_params={}):
     elif model_name == "CNN":
         def model_fn(kernel_size, stride, num_filters, num_conv_layers, pooling, dropout_rate,
                      learning_rate):
-            dropout_rate = 0.725
-            kernel_size = 5
-            num_conv_layers = 2
-            num_filters = 44
-            pooling = "max"
-            stride = 3
-            learning_rate = 0.009
+            # dropout_rate = 0.725
+            # kernel_size = 5
+            # num_conv_layers = 2
+            # num_filters = 44
+            # pooling = "max"
+            # stride = 3
+            # learning_rate = 0.009
             return build_cnn_model(kernel_size=kernel_size, stride=stride,
                                    num_filters=num_filters, num_conv_layers=num_conv_layers,
                                    pooling=pooling, dropout_rate=dropout_rate,
@@ -326,9 +329,9 @@ def parse_model_name(model_name: str, model_init_params={}):
         model = KerasClassifier(build_fn=model_fn)
     elif model_name == "LSTM":
         def model_fn(lstm_units, dropout_rate, num_lstm_layers, learning_rate):
-            lstm_units = 82
-            learning_rate = 0.002
-            num_lstm_layers = 1
+            # lstm_units = 82
+            # learning_rate = 0.002
+            # num_lstm_layers = 1
             return build_lstm_model(lstm_units=lstm_units,
                                     dropout_rate=dropout_rate, num_lstm_layers=num_lstm_layers,
                                     learning_rate=learning_rate,
@@ -400,8 +403,9 @@ def save_search_results(search):
 def add_callbacks_to_fit_params(fit_params, validation_data):
     filename = f"{config.SOURCES_ROOT_PATH.parent}/logs/{ex.current_run._id}/train_history.csv"
     history_logger = tf.keras.callbacks.CSVLogger(filename, separator=",", append=False)
+    early_stopping = [tf.keras.callbacks.EarlyStopping(patience=10, restore_best_weights=True)]
     fit_params = fit_params.copy()
-    fit_params["classifier__callbacks"] = [history_logger]
+    fit_params["classifier__callbacks"] = [history_logger, early_stopping]
 
     fit_params["classifier__validation_data"] = validation_data
     return fit_params
@@ -449,8 +453,9 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
 
     # load model
     model = parse_model_name(model_name=model_name, model_init_params=model_init_params)
-    scaler = parse_scaler_name(scaler_name=scaler_name, scaler_params=scaler_params)
-    pipeline_steps = [("scaler", scaler), ("classifier", model)]
+    # scaler = parse_scaler_name(scaler_name=scaler_name, scaler_params=scaler_params)
+    # pipeline_steps = [("scaler", scaler), ("classifier", model)]
+    pipeline_steps = [("classifier", model)]
     if model_name == "MINIROCKET":
         pipeline_steps.insert(1, ("minirocket", MiniRocketMultivariate()))
     pipe = Pipeline(pipeline_steps)
@@ -458,11 +463,23 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
 
     # load data
     print("loading data")
-    X_train, X_test, y_train, y_test, split_idx = load_experiment_data(
-        feature_col_indices=feature_col_indices, seed=seed, use_dummy_data=use_dummy_data,
-        test_size=test_size, nn_experiment=nn_experiment, exclude_by=exclude_by,
-        num_targets=num_targets, split_by_subjects=split_by_subjects, model_name=model_name)
+    # X_train, X_test, y_train, y_test, split_idx = load_experiment_data(
+    #     feature_col_indices=feature_col_indices, seed=seed, use_dummy_data=use_dummy_data,
+    #     test_size=test_size, nn_experiment=nn_experiment, exclude_by=exclude_by,
+    #     num_targets=num_targets, split_by_subjects=split_by_subjects, model_name=model_name)
 
+    data = load_raw_60_sec_data()
+    X_test = data.X_test
+    X_train = data.X_train
+    X_val = data.X_val
+    y_test = data.y_test
+    y_train = data.y_train
+    y_val = data.y_val
+
+    split_idx = np.concatenate([np.ones(len(X_val)), np.repeat(-1, len(X_train))])
+    X_train = np.concatenate([X_val, X_train])
+    y_train = np.concatenate([y_val, y_train])
+    del X_val, y_val, data
     cv = PredefinedSplit(test_fold=split_idx)
     search = init_model_selection(model_selection_name, estimator=pipe,
                                   param_distribution=param_distribution, cv=cv,
@@ -476,7 +493,7 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     del search
 
     # initialize estimator with best params and retrain on complete dataset
-    if nn_experiment and model_name != "MINIROCKET":
+    if nn_experiment:  # and model_name != "MINIROCKET":
         fit_params = add_callbacks_to_fit_params(fit_params=fit_params,
                                                  validation_data=(X_test, y_test))
     # train model on entire dataset
