@@ -1,5 +1,4 @@
 """Classification Models"""
-import math
 
 from sklearn.base import TransformerMixin
 from sklearn.preprocessing import StandardScaler
@@ -91,6 +90,7 @@ def build_cnn_model(input_shape,
     print(model.summary())
     return model
 
+
 def build_lstm_model(input_shape,
                      lstm_units=128,
                      learning_rate=.001,
@@ -100,7 +100,7 @@ def build_lstm_model(input_shape,
     prev_layer = input_layer
     return_sequences = True
     for i in range(num_lstm_layers):
-        if i == num_lstm_layers-1:
+        if i == num_lstm_layers - 1:
             return_sequences = False
         lstm = keras.layers.LSTM(units=lstm_units, return_sequences=return_sequences)(prev_layer)
         prev_layer = lstm
@@ -114,11 +114,3 @@ def build_lstm_model(input_shape,
     model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
     print(model.summary())
     return model
-
-# learning rate schedule
-def step_decay(epoch):
-	initial_lrate = 0.01
-	drop = 0.5
-	epochs_drop = 10.0
-	lrate = initial_lrate * math.pow(drop, math.floor((1+epoch)/epochs_drop))
-	return lrate

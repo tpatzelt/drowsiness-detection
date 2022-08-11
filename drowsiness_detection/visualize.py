@@ -14,10 +14,10 @@ from sklearn.metrics import auc, classification_report
 from sklearn.model_selection import StratifiedKFold, RandomizedSearchCV, GridSearchCV
 
 from drowsiness_detection import config
-from drowsiness_detection.data import get_session_idx, get_subject_idx
+from drowsiness_detection.data import get_session_idx, get_subject_idx, load_experiment_data
 from drowsiness_detection.data import (label_names_dict)
 from drowsiness_detection.data import (load_experiment_objects, load_experiment_objects_nn)
-from drowsiness_detection.run_grid_search_experiment import load_experiment_data, parse_scaler_name
+from drowsiness_detection.run_grid_search_experiment import parse_scaler_name
 
 
 def plot_acc_and_loss(history):
@@ -449,12 +449,30 @@ def plot_learning_curve_from_keras_history(history, title="Learning Curve"):
     train_acc, test_acc = [], []
     train_loss, test_loss = [], []
     epochs = []
-    for epoch, vals in history.items():
-        train_acc.append(float(vals["accuracy"]))
-        test_acc.append(float(vals["val_accuracy"]))
-        train_loss.append(float(vals["loss"]))
-        test_loss.append(float(vals["val_loss"]))
-        epochs.append(epoch)
+    if "loss" in history:
+        # parse keras history
+        for name, vals in history.items():
+            if "val" in name:
+                if "loss" in name:
+                    test_loss = vals
+                else:
+                    test_acc = vals
+            else:
+                if "loss" in name:
+                    train_loss = vals
+                else:
+                    train_acc = vals
+        epochs = list(range(len(vals)))
+
+
+    else:
+        # parse custom history with epochs as keys: Dict[int, str]
+        for epoch, vals in history.items():
+            train_acc.append(float(vals["accuracy"]))
+            test_acc.append(float(vals["val_accuracy"]))
+            train_loss.append(float(vals["loss"]))
+            test_loss.append(float(vals["val_loss"]))
+            epochs.append(epoch)
 
     def plot_learning_curve_from_values(train_vals, test_vals, x_axis_vals,
                                         title, y_label, ax=None):
