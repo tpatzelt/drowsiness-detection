@@ -537,16 +537,16 @@ class Data:
     y_val: np.ndarray = None
 
 
-def load_raw_60_sec_data(path=None):
+def load_raw_60_sec_data(path=None, num_fold=1):
     """ generated with seed 42"""
     if path is None:
         path = config.SOURCES_ROOT_PATH.parent.joinpath("data/preprocessed/60sec/raw_features")
-    X_train = np.load(str(path.joinpath("X_train.npy")))
-    X_val = np.load(str(path.joinpath("X_val.npy")))
-    X_test = np.load(str(path.joinpath("X_test.npy")))
-    y_train = np.load(str(path.joinpath("y_train.npy")))
-    y_val = np.load(str(path.joinpath("y_val.npy")))
-    y_test = np.load(str(path.joinpath("y_test.npy")))
+    X_train = np.load(str(path.joinpath(f"X_train_{num_fold}.npy")))
+    X_val = np.load(str(path.joinpath(f"X_val_{num_fold}.npy")))
+    X_test = np.load(str(path.joinpath(f"X_test_{num_fold}.npy")))
+    y_train = np.load(str(path.joinpath(f"y_train_{num_fold}.npy")))
+    y_val = np.load(str(path.joinpath(f"y_val_{num_fold}.npy")))
+    y_test = np.load(str(path.joinpath(f"y_test_{num_fold}.npy")))
     return Data(X_train, X_test, y_train, y_test, X_val, y_val)
 
 
