@@ -1,6 +1,7 @@
 from copy import deepcopy
 from pathlib import Path
 
+import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -10,7 +11,7 @@ from matplotlib.widgets import Slider
 from scipy.interpolate import griddata
 from sklearn.metrics import RocCurveDisplay
 from sklearn.metrics import accuracy_score
-from sklearn.metrics import auc, classification_report
+from sklearn.metrics import auc, classification_report, roc_curve
 from sklearn.model_selection import StratifiedKFold, RandomizedSearchCV, GridSearchCV
 
 from drowsiness_detection import config
@@ -480,7 +481,7 @@ def plot_learning_curve_from_keras_history(history, title="Learning Curve"):
             fig, ax = plt.subplots()
         ax.set_title(title)
         ax.plot(x_axis_vals, train_vals, '-r', label="train")
-        ax.plot(x_axis_vals, test_vals, '-g', label="test")
+        ax.plot(x_axis_vals, test_vals, '-g', label="val")
         ax.set_xlabel("Number of Steps")
         ax.set_ylabel(y_label)
         _ = ax.legend()
@@ -492,6 +493,48 @@ def plot_learning_curve_from_keras_history(history, title="Learning Curve"):
                                     title=title, ax=axes[1], y_label="Loss")
     plt.tight_layout()
 
+
+def plot_learning_curve_from_keras_histories(histories, title="Learning Curve", axes=None):
+    def plot_learning_curve_from_values(train_vals, test_vals, x_axis_vals,
+                                        title, y_label, ax=None):
+        if ax is None:
+            fig, ax = plt.subplots()
+        ax.set_title(title)
+        ax.plot(x_axis_vals, train_vals, '-r')
+        ax.plot(x_axis_vals, test_vals, '-g')
+        ax.set_xlabel("Number of Steps")
+        ax.set_ylabel(y_label)
+
+    if axes is None:
+        fig, axes = plt.subplots(2, 1)
+
+    for history in histories:
+        train_acc, test_acc = [], []
+        train_loss, test_loss = [], []
+        epochs = []
+        # parse keras history
+        for name, vals in history.items():
+            if "val" in name:
+                if "loss" in name:
+                    test_loss = vals
+                else:
+                    test_acc = vals
+            else:
+                if "loss" in name:
+                    train_loss = vals
+                else:
+                    train_acc = vals
+        epochs = list(range(len(vals)))
+        plot_learning_curve_from_values(train_acc, test_acc, epochs,
+                                        title=title, ax=axes[0], y_label="Accuracy")
+        plot_learning_curve_from_values(train_loss, test_loss, epochs,
+                                        title=title, ax=axes[1], y_label="Loss")
+
+    red_patch = mpatches.Patch(color='red', label='train')
+    green_patch = mpatches.Patch(color='green', label='val')
+    for ax in axes:
+        ax.legend(handles=[red_patch, green_patch])
+    plt.tight_layout()
 
 def plot_cv_test_train_scores_as_scatter(search_results, model_type="lstm"):
     if model_type == "cnn":
@@ -611,3 +654,87 @@ def plot_roc_curve_from_log_dir_nn(experiment_id, plot_train_roc: bool = False, 
     report = classification_report(y_true=y_test, y_pred=y_pred_test,
                                    target_names=label_names_dict[exp_config["num_targets"]])
     print(report)
+
+
+def plot_roc_over_n_folds_from_predictions(y_trues, y_preds, model_name, ax=None, plot_chance=True,
+                                           show_std_in_Legend=True, plot_fold_labels=True,
+                                           split_name="", plot_std=True,
+                                           plot_folds=True, color=None):
+    tprs = []
+    aucs = []
+    mean_fpr = np.linspace(0, 1, 100)
+
+    if ax is None:
+        fig, ax = plt.subplots()
+    for i, (y_true, y_pred) in enumerate(zip(y_trues, y_preds)):
+        if plot_folds:
+            viz = RocCurveDisplay.from_predictions(
+                y_true=y_true,
+                y_pred=y_pred,
+                name=("_" if not plot_fold_labels else "") + f"{model_name} fold {i + 1}",
+                alpha=0.3,
+                lw=1,
+                ax=ax,
+                pos_label=1,
+                color=color
+            )
+            fpr = viz.fpr
+            tpr = viz.tpr
+            roc_auc = viz.roc_auc
+        else:
+            fpr, tpr, _ = roc_curve(
+                y_true,
+                y_pred,
+                pos_label=None,
+                sample_weight=None,
+                drop_intermediate=None,
+            )
+            roc_auc = auc(fpr, tpr)
+            ax.set_xlabel('False Positive Rate (Positive Label: 1)')
+            # Y label
+            ax.set_ylabel('True Positive Rate (Positive Label: 1)')
+
+        interp_tpr = np.interp(mean_fpr, fpr, tpr)
+        interp_tpr[0] = 0.0
+        tprs.append(interp_tpr)
+        aucs.append(roc_auc)
+    if plot_chance:
+        ax.plot([0, 1], [0, 1], linestyle="--", lw=2, color="r", alpha=0.8, label="Chance")
+
+    mean_tpr = np.mean(tprs, axis=0)
+    mean_tpr[-1] = 1.0
+    mean_auc = auc(mean_fpr, mean_tpr)
+    std_auc = np.std(aucs)
+    ax.plot(
+        mean_fpr,
+        mean_tpr,
+        # color="b",
+        label=r"Mean %s ROC (AUC = %0.2f $\pm$ %0.2f)" % (model_name, mean_auc, std_auc),
+        lw=3,
+        alpha=1,
+    )
+
+    std_tpr = np.std(tprs, axis=0)
+    tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
+    tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
+    if show_std_in_Legend:
+        std_label = r"$\pm$ 1 std. dev."
+    else:
+        std_label = ""
+    if plot_std:
+        ax.fill_between(
+            mean_fpr,
+            tprs_lower,
+            tprs_upper,
+            color="grey",
+            alpha=0.2,
+            label=std_label,
+        )
+
+    ax.set(
+        xlim=[-0.05, 1.05],
+        ylim=[-0.05, 1.05],
+        title=f"ROC for {model_name}" + (f" on {split_name} data." if split_name else ""),
+    )
+    ax.legend(loc="lower right")
+    ax.grid()
