@@ -1,6 +1,3 @@
-# from sklearnex import patch_sklearn
-#
-# patch_sklearn()
 import os
 from pathlib import Path
 from typing import Tuple
@@ -14,12 +11,9 @@ from sacred import SETTINGS
 from sacred.observers import FileStorageObserver
 from sklearn.dummy import DummyClassifier
 from sklearn.ensemble import RandomForestClassifier
-# explicitly require this experimental feature
-from sklearn.experimental import enable_halving_search_cv  # noqa
 from sklearn.linear_model import LogisticRegression, RidgeClassifier
-# now you can import normally from model_selection
-from sklearn.model_selection import HalvingRandomSearchCV, RandomizedSearchCV, GridSearchCV, \
-    PredefinedSplit
+from sklearn.model_selection import (RandomizedSearchCV, GridSearchCV,
+                                     PredefinedSplit)
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sktime.transformations.panel.rocket import MiniRocketMultivariate
@@ -42,7 +36,7 @@ ex.observers.append(FileStorageObserver(Path(__file__).parent.parent.joinpath("l
 def base():
     seed = 45
     test_size = .2
-    model_selection_name = "halving-random"
+    model_selection_name = "random"
     scaler_name = ""
     scaler_params = {}
 
@@ -348,8 +342,8 @@ def parse_model_name(model_name: str, model_init_params={}):
 def parse_model_selection_name(model_selection_name: str):
     if model_selection_name == "random":
         model_selection = RandomizedSearchCV
-    elif model_selection_name == "halving-random":
-        model_selection = HalvingRandomSearchCV
+    # elif model_selection_name == "halving-random":
+    #     model_selection = HalvingRandomSearchCV
     elif model_selection_name == "grid":
         model_selection = GridSearchCV
     else:
