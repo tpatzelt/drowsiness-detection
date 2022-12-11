@@ -114,3 +114,29 @@ def build_lstm_model(input_shape,
     model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
     print(model.summary())
     return model
+
+
+def build_bi_lstm_model(input_shape,
+                        lstm_units=128,
+                        learning_rate=.001,
+                        dropout_rate=0.2,
+                        num_lstm_layers=2):
+    input_layer = keras.layers.Input(input_shape[1:])
+    prev_layer = input_layer
+    return_sequences = True
+    for i in range(num_lstm_layers):
+        if i == num_lstm_layers - 1:
+            return_sequences = False
+        lstm = keras.layers.Bidrectional(
+            keras.layers.LSTM(units=lstm_units, return_sequences=return_sequences))(prev_layer)
+        prev_layer = lstm
+    flatten = keras.layers.Flatten()(prev_layer)
+    dropout = keras.layers.Dropout(dropout_rate)(flatten)
+
+    output_layer = keras.layers.Dense(1, activation="sigmoid")(dropout)
+    model = keras.models.Model(inputs=input_layer, outputs=output_layer)
+
+    optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
+    model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
+    print(model.summary())
+    return model

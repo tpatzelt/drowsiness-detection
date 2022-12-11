@@ -11,18 +11,17 @@ from sacred import SETTINGS
 from sacred.observers import FileStorageObserver
 from sklearn.dummy import DummyClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression, RidgeClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import (RandomizedSearchCV, GridSearchCV,
                                      PredefinedSplit)
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
-from sktime.transformations.panel.rocket import MiniRocketMultivariate
 
 from drowsiness_detection import config
 from drowsiness_detection.data import (load_raw_60_sec_data)
 from drowsiness_detection.helpers import spec_to_config_space
 from drowsiness_detection.models import build_dummy_tf_classifier, ThreeDStandardScaler, \
-    build_dense_model, build_lstm_model, build_cnn_model
+    build_dense_model, build_lstm_model, build_cnn_model, build_bi_lstm_model
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
@@ -135,9 +134,6 @@ def random_forest():
     model_selection_name = "random"
     model_name = "RandomForestClassifier"
     grid_search_params = {
-        # "factor": 3,
-        # "max_resources": 1000,
-        # "resource": 'classifier__n_estimators',
         "scoring": "accuracy",
         "return_train_score": True,
         "n_iter": 300
@@ -146,23 +142,15 @@ def random_forest():
     scaler_name = "standard"
     hyperparameter_specs = [
         dict(name="CategoricalHyperparameter",
-             # kwargs=dict(name="classifier__criterion", choices=["gini", "entropy"])),
-             kwargs=dict(name="classifier__criterion", choices=["entropy"])),
+             kwargs=dict(name="classifier__criterion", choices=["gini", "entropy"])),
         dict(name="UniformIntegerHyperparameter",
              kwargs=dict(name="classifier__max_depth", lower=2, upper=60, log=False)),
-        # dict(name="CategoricalHyperparameter",
-        #      kwargs=dict(name="classifier__max_depth", choices=[max_depth])),
         dict(name="CategoricalHyperparameter",
-             # kwargs=dict(name="classifier__max_features", choices=["sqrt", "log2"])),
-             kwargs=dict(name="classifier__max_features", choices=["sqrt"])),
+             kwargs=dict(name="classifier__max_features", choices=["sqrt", "log2"])),
         dict(name="CategoricalHyperparameter",
              kwargs=dict(name="classifier__n_estimators", choices=[512])),
         dict(name="CategoricalHyperparameter",
-             kwargs=dict(name="classifier__class_weight", choices=["balanced"])),
-        # dict(name="CategoricalHyperparameter",
-        #      kwargs=dict(name="classifier__max_samples", choices=[.6,.8])),
-        # dict(name="CategoricalHyperparameter",
-        #      kwargs=dict(name="classifier__min_samples_split", choices=[0.015, 0.03]))
+             kwargs=dict(name="classifier__class_weight", choices=["", "balanced"])),
         dict(name="UniformFloatHyperparameter",
              kwargs=dict(name="classifier__min_samples_split", lower=0.005, upper=0.06, log=False)),
     ]
@@ -180,7 +168,7 @@ def dense_nn():
         "n_iter": 5,
         "n_jobs": 1,
     }
-    fit_params = {"classifier__epochs": 2, "classifier__batch_size": 10}
+    fit_params = {"classifier__epochs": 2, "classifier__batch_size": 32}
     model_init_params = {"input_shape": (20, 300, 7)}
     scaler_name = "3D-standard"
     scaler_params = {"feature_axis": -1}
@@ -188,7 +176,6 @@ def dense_nn():
     hyperparameter_specs = [
         dict(name="UniformIntegerHyperparameter",
              kwargs=dict(name="classifier__num_hidden", lower=32, upper=2024, log=False)),
-        # kwargs = dict(name="classifier__num_hidden", lower=2, upper=3, log=False)),
     ]
     feature_col_indices = (5, 8, 9, 14, 15, 16, 19)
 
@@ -204,7 +191,7 @@ def cnn():
         "n_iter": 40,
         "n_jobs": 1,
     }
-    fit_params = {"classifier__epochs": 150, "classifier__batch_size": 20,
+    fit_params = {"classifier__epochs": 150, "classifier__batch_size": 32,
                   'classifier__verbose': 0, "classifier__class_weight": {"0": 0.84, "1": 1.14}}
     model_init_params = {"input_shape": (20, 1800, 7)}
     scaler_name = "3D-standard"
@@ -240,7 +227,7 @@ def lstm():
         "n_iter": 20,
         "n_jobs": 1,
     }
-    fit_params = {"classifier__epochs": 25, "classifier__batch_size": 30,
+    fit_params = {"classifier__epochs": 25, "classifier__batch_size": 32,
                   'classifier__verbose': 1, "classifier__class_weight": {"0": 0.84, "1": 1.14}}
     model_init_params = {"input_shape": (20, 1800, 7)}
     scaler_name = "3D-standard"
@@ -248,40 +235,37 @@ def lstm():
     hyperparameter_specs = [
         dict(name="UniformIntegerHyperparameter",
              kwargs=dict(name="classifier__lstm_units", lower=8, upper=128, log=False)),
-        # dict(name="UniformIntegerHyperparameter",
-        #      kwargs=dict(name="classifier__lstm2_units", lower=8, upper=128, log=False)),
         dict(name="UniformFloatHyperparameter",
              kwargs=dict(name="classifier__dropout_rate", lower=0.4, upper=.9, log=False)),
         dict(name="UniformIntegerHyperparameter",  # inclusive interval
              kwargs=dict(name="classifier__num_lstm_layers", lower=1, upper=3, log=False)),
-        dict(name="UniformFloatHyperparameter",
-             kwargs=dict(name="classifier__learning_rate", lower=0.0001, upper=0.05, log=True)),
-    ]  # try smaller learning rate to mitigate nan loss
+    ]
     feature_col_indices = (5, 8, 9, 14, 15, 16, 19)
 
 
 @ex.named_config
-def minirocket():
+def bi_lstm():
     nn_experiment = True
     model_selection_name = "random"
-    model_name = "MINIROCKET"
+    model_name = "LSTM"
     grid_search_params = {
         "scoring": "accuracy",
         "return_train_score": True,
-        "n_iter": 5,
+        "n_iter": 20,
         "n_jobs": 1,
     }
-    fit_params = {}
+    fit_params = {"classifier__epochs": 25, "classifier__batch_size": 32,
+                  'classifier__verbose': 1, "classifier__class_weight": {"0": 0.84, "1": 1.14}}
     model_init_params = {"input_shape": (20, 1800, 7)}
     scaler_name = "3D-standard"
-    scaler_params = {"feature_axis": 1}
+    scaler_params = {"feature_axis": -1}
     hyperparameter_specs = [
-        dict(name="UniformFloatHyperparameter",
-             kwargs=dict(name="classifier__alpha", lower=2, upper=150)),
         dict(name="UniformIntegerHyperparameter",
-             kwargs=dict(name="minirocket__num_kernels", lower=10000, upper=10001)),
-        dict(name="CategoricalHyperparameter",
-             kwargs=dict(name="classifier__class_weight", choices=["balanced"])),
+             kwargs=dict(name="classifier__lstm_units", lower=8, upper=128, log=False)),
+        dict(name="UniformFloatHyperparameter",
+             kwargs=dict(name="classifier__dropout_rate", lower=0.4, upper=.9, log=False)),
+        dict(name="UniformIntegerHyperparameter",  # inclusive interval
+             kwargs=dict(name="classifier__num_lstm_layers", lower=1, upper=3, log=False)),
     ]
     feature_col_indices = (5, 8, 9, 14, 15, 16, 19)
 
@@ -307,13 +291,6 @@ def parse_model_name(model_name: str, model_init_params={}):
     elif model_name == "CNN":
         def model_fn(kernel_size, stride, num_filters, num_conv_layers, pooling, dropout_rate,
                      learning_rate):
-            # dropout_rate = 0.725
-            # kernel_size = 5
-            # num_conv_layers = 2
-            # num_filters = 44
-            # pooling = "max"
-            # stride = 3
-            # learning_rate = 0.009
             return build_cnn_model(kernel_size=kernel_size, stride=stride,
                                    num_filters=num_filters, num_conv_layers=num_conv_layers,
                                    pooling=pooling, dropout_rate=dropout_rate,
@@ -323,17 +300,20 @@ def parse_model_name(model_name: str, model_init_params={}):
         model = KerasClassifier(build_fn=model_fn)
     elif model_name == "LSTM":
         def model_fn(lstm_units, dropout_rate, num_lstm_layers, learning_rate):
-            # lstm_units = 82
-            # learning_rate = 0.002
-            # num_lstm_layers = 1
             return build_lstm_model(lstm_units=lstm_units,
                                     dropout_rate=dropout_rate, num_lstm_layers=num_lstm_layers,
                                     learning_rate=learning_rate,
                                     **model_init_params)
 
         model = KerasClassifier(build_fn=model_fn)
-    elif model_name == "MINIROCKET":
-        model = RidgeClassifier(normalize=True)
+    elif model_name == "Bi-LSTM":
+        def model_fn(lstm_units, dropout_rate, num_lstm_layers, learning_rate):
+            return build_bi_lstm_model(lstm_units=lstm_units,
+                                       dropout_rate=dropout_rate, num_lstm_layers=num_lstm_layers,
+                                       learning_rate=learning_rate,
+                                       **model_init_params)
+
+        model = KerasClassifier(build_fn=model_fn)
     else:
         raise ValueError
     return model
@@ -342,8 +322,6 @@ def parse_model_name(model_name: str, model_init_params={}):
 def parse_model_selection_name(model_selection_name: str):
     if model_selection_name == "random":
         model_selection = RandomizedSearchCV
-    # elif model_selection_name == "halving-random":
-    #     model_selection = HalvingRandomSearchCV
     elif model_selection_name == "grid":
         model_selection = GridSearchCV
     else:
@@ -367,7 +345,6 @@ def init_model_selection(model_selection_name, estimator, param_distribution, cv
                          grid_search_params, seed):
     model_selection = parse_model_selection_name(model_selection_name=model_selection_name)
     if model_selection is GridSearchCV:
-        ## not tested
         search = model_selection(estimator=estimator,
                                  param_grid=param_distribution.sample_configuration(
                                      grid_search_params.pop("n_iter")),
@@ -447,21 +424,12 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
 
     # load model
     model = parse_model_name(model_name=model_name, model_init_params=model_init_params)
-    # scaler = parse_scaler_name(scaler_name=scaler_name, scaler_params=scaler_params)
-    # pipeline_steps = [("scaler", scaler), ("classifier", model)]
     pipeline_steps = [("classifier", model)]
-    if model_name == "MINIROCKET":
-        pipeline_steps.insert(1, ("minirocket", MiniRocketMultivariate()))
     pipe = Pipeline(pipeline_steps)
     param_distribution = spec_to_config_space(specs=hyperparameter_specs)
 
     # load data
     print("loading data")
-    # X_train, X_test, y_train, y_test, split_idx = load_experiment_data(
-    #     feature_col_indices=feature_col_indices, seed=seed, use_dummy_data=use_dummy_data,
-    #     test_size=test_size, nn_experiment=nn_experiment, exclude_by=exclude_by,
-    #     num_targets=num_targets, split_by_subjects=split_by_subjects, model_name=model_name)
-
     data = load_raw_60_sec_data()
     X_test = data.X_test
     X_train = data.X_train
@@ -473,7 +441,7 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     split_idx = np.concatenate([np.ones(len(X_val)), np.repeat(-1, len(X_train))])
     X_train = np.concatenate([X_val, X_train])
     y_train = np.concatenate([y_val, y_train])
-    del X_val, y_val, data
+    del X_val, y_val, data  # for memory efficiency
     cv = PredefinedSplit(test_fold=split_idx)
     search = init_model_selection(model_selection_name, estimator=pipe,
                                   param_distribution=param_distribution, cv=cv,
@@ -487,7 +455,7 @@ def run(recording_frequency: int, window_in_sec: int, model_selection_name: str,
     del search
 
     # initialize estimator with best params and retrain on complete dataset
-    if nn_experiment:  # and model_name != "MINIROCKET":
+    if nn_experiment:
         fit_params = add_callbacks_to_fit_params(fit_params=fit_params,
                                                  validation_data=(X_test, y_test))
     # train model on entire dataset
