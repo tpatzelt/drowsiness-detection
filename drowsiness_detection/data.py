@@ -147,6 +147,17 @@ def get_train_test_splits(directory: Path = config.PATHS.TRAIN_TEST_SPLIT) -> Tu
         
     Returns:
         Tuple of (test_data, train_data) as concatenated arrays
+    """
+    for file in directory.iterdir():
+        y = np.load(file)[:, -1]
+        y = binarize(y, KSS_THRESHOLD)
+        loaded_file = np.load(file)
+        loaded_file[:, -1] = y
+        if file.stem[:5] == "train":
+            train_data.append(loaded_file)
+        elif file.stem[:4] == "test":
+            test_data.append(loaded_file)
+        else:
             raise RuntimeError(f"Cannot assign {file} to train or test split.")
     train = np.concatenate(train_data)
     test = np.concatenate(test_data)
