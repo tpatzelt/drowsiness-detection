@@ -22,16 +22,25 @@ import tensorflow as tf
 from sklearn.model_selection import train_test_split
 
 from drowsiness_detection import config
+from drowsiness_detection.constants import (
+    KSS_THRESHOLD,
+    KSS_DISCRETIZATION_BINS,
+    INTERPOLATED_KSS_INDEX,
+    SESSION_TYPE_MAPPING,
+    DEFAULT_MAX_FILE_SIZE_MB,
+    DEFAULT_FEATURE_COLS,
+    DEFAULT_TRAIN_FILES,
+    DEFAULT_TEST_FILES,
+    LABEL_NAMES,
+)
 from drowsiness_detection.helpers import binarize, ArrayWrapper, name_generator
+from drowsiness_detection.validation import validate_num_targets
+from drowsiness_detection.logging_utils import get_logger
 
-session_type_mapping = dict(a=1, b=2, e=3, s=4)
+logger = get_logger(__name__)
 
-label_names_dict = {  # num_targets: label_names
-    2: ["not drowsy", "drowsy"],
-    3: ["active", "neutral", "drowsy"],
-    5: ["alert", "awake", "neutral", "slightly drowsy", "drowsy"],
-    9: [str(num) for num in range(1, 10)]
-}
+session_type_mapping = SESSION_TYPE_MAPPING
+label_names_dict = LABEL_NAMES
 
 
 def filename_to_session_type_and_id(filename: Path) -> Tuple[str, int]:
@@ -61,19 +70,21 @@ def get_kss_labels_for_feature_file(feature_file_path: Path) -> Union[np.ndarray
     Returns:
         Array of KSS labels or None if not found
     """
-    interpolated_kss_index = 2
     identifier = str(feature_file_path.stem)[-11:]
     for label_file in config.PATHS.LABEL_DATA.iterdir():
         if identifier in str(label_file):
-            return np.load(label_file)[:, interpolated_kss_index]
+            return np.load(label_file)[:, INTERPOLATED_KSS_INDEX]
     else:
+        logger.warning(f"Could not find label file for {feature_file_path}")
         return None
 
 
 def window_files_train_test_split(
         target_dir: Path = config.PATHS.TRAIN_TEST_SPLIT,
-        max_filesize_in_mb: int = 100, n_cols: int = 786, train_size: int = 2,
-        test_size: int = 1) -> None:
+        max_filesize_in_mb: int = DEFAULT_MAX_FILE_SIZE_MB,
+        n_cols: int = DEFAULT_FEATURE_COLS,
+        train_size: int = DEFAULT_TRAIN_FILES,
+        test_size: int = DEFAULT_TEST_FILES) -> None:
     """Create train/test split from window feature files.
     
     Iterates through all features files, loads corresponding labels, and randomly
@@ -225,32 +236,26 @@ def get_feature_data(data_path: Path = config.PATHS.WINDOW_FEATURES):
 
 
 def preprocess_feature_data(feature_data: np.ndarray, exclude_sess_type: int, num_targets: int):
-    """Preprocessing the feature data includes removing NaNs,
-    binarize kss scores and split into features and targets.
-    returns subject_data which is an array [:, sess id, subject id]"""
+    """Preprocess feature data by removing NaNs and discretizing labels.
+    
+    Args:
+        feature_data: Raw feature data array with features, KSS, session type, subject ID
+        exclude_sess_type: Session type to exclude from processing
+        num_targets: Number of target classes
+        
+    Returns:
+        Tuple of (X, y, subject_data) where:
+            - X: Feature matrix
+            - y: Target labels
+            - subject_data: Array of [session_type, subject_id] pairs
+    """
     # col -3 is targets, -2 is sess type and -1 is subject id
     feature_data = np.nan_to_num(feature_data)
     targets = feature_data[:, -3]
-    if num_targets == 2:
-        KSS_THRESHOLD = 7
-        targets = binarize(targets, threshold=KSS_THRESHOLD)
-    elif num_targets == 3:
-        ALERT = 6
-        NEUTRAL = 8
-        SLEEPY = 10
-        targets = np.digitize(targets, bins=[ALERT, NEUTRAL, SLEEPY])
-    elif num_targets == 5:
-        first = 3
-        second = 5
-        third = 7
-        forth = 9
-        fifth = 10
-        targets = np.digitize(targets, bins=[first, second, third, forth, fifth])
-    elif num_targets == 9:
-        targets = np.digitize(targets, bins=range(1, 10))
-    else:
-        raise ValueError(f"num targets {num_targets} not supported.")
-
+    
+    # Use centralized discretization function
+    targets = discretize_labels_by_threshold(targets, num_targets=num_targets)
+    
     feature_data[:, -3] = targets
     # remove one session type
     feature_data = feature_data[feature_data[:, -2] != exclude_sess_type]
@@ -260,27 +265,26 @@ def preprocess_feature_data(feature_data: np.ndarray, exclude_sess_type: int, nu
     return X, y, subject_data
 
 
-def discretize_labels_by_threshold(targets, num_targets: int):
+def discretize_labels_by_threshold(targets: np.ndarray, num_targets: int) -> np.ndarray:
+    """Discretize continuous KSS labels into discrete classes.
+    
+    Args:
+        targets: Array of KSS labels (1-9)
+        num_targets: Number of target classes (2, 3, 5, or 9)
+        
+    Returns:
+        Discretized labels
+        
+    Raises:
+        ValueError: If num_targets is not supported
+    """
+    validate_num_targets(num_targets)
+    
     if num_targets == 2:
-        KSS_THRESHOLD = 7
-        targets = binarize(targets, threshold=KSS_THRESHOLD)
-    elif num_targets == 3:
-        ALERT = 6
-        NEUTRAL = 8
-        SLEEPY = 10
-        targets = np.digitize(targets, bins=[ALERT, NEUTRAL, SLEEPY])
-    elif num_targets == 5:
-        first = 3
-        second = 5
-        third = 7
-        forth = 9
-        fifth = 10
-        targets = np.digitize(targets, bins=[first, second, third, forth, fifth])
-    elif num_targets == 9:
-        targets = np.digitize(targets, bins=range(1, 10))
+        return binarize(targets, threshold=KSS_THRESHOLD)
     else:
-        raise ValueError(f"num targets {num_targets} not supported.")
-    return targets
+        bins = KSS_DISCRETIZATION_BINS[num_targets]
+        return np.digitize(targets, bins=bins)
 
 
 def get_data_for_nn(data_path: Path = config.PATHS.WINDOW_DATA):
