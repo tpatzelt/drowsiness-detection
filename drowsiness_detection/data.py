@@ -1,3 +1,12 @@
+"""Data loading, preprocessing, and dataset management for drowsiness detection.
+
+This module handles:
+- Loading raw eye-tracking and eye-closure signals
+- Preprocessing and feature extraction
+- Train/test split generation
+- Dataset classes for model training
+"""
+
 import json
 import random
 from csv import DictReader
@@ -25,7 +34,15 @@ label_names_dict = {  # num_targets: label_names
 }
 
 
-def filename_to_session_type_and_id(filename: Path):
+def filename_to_session_type_and_id(filename: Path) -> Tuple[str, int]:
+    """Extract session type and subject ID from filename.
+    
+    Args:
+        filename: Path object of feature file
+        
+    Returns:
+        Tuple of (session_type, subject_id)
+    """
     a = filename.name
     elements = a.split("_")
     session_type = elements[-2]
@@ -33,7 +50,17 @@ def filename_to_session_type_and_id(filename: Path):
     return session_type, identifier
 
 
-def get_kss_labels_for_feature_file(feature_file_path):
+def get_kss_labels_for_feature_file(feature_file_path: Path) -> Union[np.ndarray, None]:
+    """Load Karolinska Sleepiness Scale (KSS) labels for a feature file.
+    
+    Finds corresponding label file and extracts interpolated KSS values.
+    
+    Args:
+        feature_file_path: Path to feature file
+        
+    Returns:
+        Array of KSS labels or None if not found
+    """
     interpolated_kss_index = 2
     identifier = str(feature_file_path.stem)[-11:]
     for label_file in config.PATHS.LABEL_DATA.iterdir():
@@ -46,10 +73,23 @@ def get_kss_labels_for_feature_file(feature_file_path):
 def window_files_train_test_split(
         target_dir: Path = config.PATHS.TRAIN_TEST_SPLIT,
         max_filesize_in_mb: int = 100, n_cols: int = 786, train_size: int = 2,
-        test_size: int = 1):
-    """ Iterates through all features files under 'config.WINDOW_FEATURES_PATH,
-     fetches the label file and writes each row randomly to either the test or
-     train set."""
+        test_size: int = 1) -> None:
+    """Create train/test split from window feature files.
+    
+    Iterates through all features files, loads corresponding labels, and randomly
+    assigns rows to train or test sets. Uses ArrayWrapper for memory-efficient
+    writing of large arrays to disk.
+    
+    Args:
+        target_dir: Directory to save split data
+        max_filesize_in_mb: Maximum file size in MB for chunk saving
+        n_cols: Number of columns in feature arrays
+        train_size: Number of train files to create
+        test_size: Number of test files to create
+        
+    Raises:
+        RuntimeError: If target directory already exists
+    """
     if not target_dir.exists():
         target_dir.mkdir()
     else:
@@ -86,18 +126,16 @@ def window_files_train_test_split(
     np.save(sub_target_dir.joinpath("test"), test_identifiers)  # noqa
 
 
-def get_train_test_splits(directory: Path = config.PATHS.TRAIN_TEST_SPLIT):
-    KSS_THRESHOLD = 7
-    test_data, train_data = [], []
-    for file in sorted(directory.iterdir()):
-        if file.is_dir():
-            continue
-        arr = np.load(file=file)  # noqa
-        if "test" in file.name:
-            test_data.append(arr)
-        elif "train" in file.name:
-            train_data.append(arr)
-        else:
+def get_train_test_splits(directory: Path = config.PATHS.TRAIN_TEST_SPLIT) -> Tuple[np.ndarray, np.ndarray]:
+    """Load train and test data from split files.
+    
+    Binarizes targets using KSS_THRESHOLD of 7.
+    
+    Args:
+        directory: Directory containing split data files
+        
+    Returns:
+        Tuple of (test_data, train_data) as concatenated arrays
             raise RuntimeError(f"Cannot assign {file} to train or test split.")
     train = np.concatenate(train_data)
     test = np.concatenate(test_data)
